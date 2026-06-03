@@ -2,120 +2,137 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>民盟市委参政议政赋能平台</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#FAFAF7" />
+    <title>参政议政赋能平台 · 民盟市委</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <header class="app-header">
-      <div class="header-inner">
-        <div>
-          <p class="eyebrow">一期 MVP · 公开资料自动研判</p>
-          <h1>民盟市委参政议政赋能平台</h1>
-        </div>
-        <nav class="top-nav" aria-label="主导航">
-          <a href="#radar">关注点雷达</a>
-          <a href="#cuts">切口孵化</a>
-          <a href="#workbench">成果工作台</a>
-          <a href="#sources">公开信源</a>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="#">
+          <span class="brand-mark"></span>
+          <span class="brand-text">参政议政赋能平台</span>
+        </a>
+        <nav class="topbar-nav" aria-label="主导航">
+          <a href="#focus">本周关注</a>
+          <a href="#cuts">候选切口</a>
+          <a href="#radar">信号雷达</a>
+          <a href="#workbench">工作台</a>
         </nav>
       </div>
     </header>
 
     <main>
-      <section class="status-strip" aria-label="平台状态">
-        <div>
-          <span class="metric-value" id="signalCount">0</span>
-          <span class="metric-label">条公开信号</span>
+      <!-- 首屏：本周三件最该看的事 -->
+      <section class="focus" id="focus">
+        <div class="focus-head">
+          <p class="eyebrow" id="focusEyebrow">本周关注</p>
+          <h1>本周最值得关注的三个参政议政切口</h1>
+          <p class="lede">基于公开权威资料综合研判，按关注热度排序。</p>
         </div>
-        <div>
-          <span class="metric-value" id="topicCount">0</span>
-          <span class="metric-label">个候选专题</span>
-        </div>
-        <div>
-          <span class="metric-value" id="sourceCount">0</span>
-          <span class="metric-label">个权威信源</span>
-        </div>
-        <div class="status-note">
-          当前为演示数据版本，后续接入定时抓取、人工校核和留痕。
-        </div>
+        <div class="focus-grid" id="focusGrid" aria-live="polite"></div>
       </section>
 
-      <section class="section-shell" id="radar">
-        <div class="section-heading">
+      <!-- 候选切口完整库 -->
+      <section class="block" id="cuts">
+        <div class="block-head">
           <div>
-            <p class="eyebrow">Radar</p>
-            <h2>领导关注点与政策变化雷达</h2>
+            <p class="eyebrow">候选切口</p>
+            <h2>切口孵化库</h2>
+            <p class="lede">围绕市委关切的中观议题拆解到机制层面，每个切口附核验路径与三档成果模板。</p>
           </div>
-          <div class="control-row">
-            <label for="themeFilter">专题筛选</label>
-            <select id="themeFilter">
+          <div class="block-tools">
+            <label class="sr-only" for="themeFilter">专题筛选</label>
+            <select id="themeFilter" class="select">
               <option value="all">全部专题</option>
             </select>
-          </div>
-        </div>
-
-        <div class="radar-layout">
-          <div class="topic-grid" id="topicGrid" aria-live="polite"></div>
-          <aside class="signal-panel" aria-label="公开信号流">
-            <div class="panel-heading">
-              <h3>公开信号流</h3>
-              <span id="signalScope">全部</span>
-            </div>
-            <div class="signal-list" id="signalList"></div>
-          </aside>
-        </div>
-      </section>
-
-      <section class="section-shell" id="cuts">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">Incubator</p>
-            <h2>自动切口孵化</h2>
-          </div>
-          <div class="search-box">
-            <label for="cutSearch">搜索切口</label>
-            <input id="cutSearch" type="search" placeholder="如：企业出海、长护险、入境消费" />
+            <label class="sr-only" for="cutSearch">搜索切口</label>
+            <input id="cutSearch" type="search" class="input" placeholder="搜索：企业出海、长护险、入境消费…" />
           </div>
         </div>
         <div class="cut-grid" id="cutGrid"></div>
       </section>
 
-      <section class="section-shell workbench" id="workbench">
-        <div class="section-heading">
+      <!-- 信号雷达 -->
+      <section class="block" id="radar">
+        <div class="block-head">
           <div>
-            <p class="eyebrow">Workbench</p>
-            <h2>成果转化工作台</h2>
+            <p class="eyebrow">信号雷达</p>
+            <h2>近期公开信号</h2>
+            <p class="lede">来自市级、中央与部委权威渠道的关键信号，按时间倒序。</p>
           </div>
-          <div class="pill-row" id="outputTabs" role="tablist" aria-label="成果类型">
-            <button class="pill active" type="button" data-output="brief">社情民意</button>
-            <button class="pill" type="button" data-output="proposal">提案建议</button>
-            <button class="pill" type="button" data-output="research">课题大纲</button>
+          <div class="block-tools">
+            <span class="scope-tag" id="signalScope">全部专题</span>
+          </div>
+        </div>
+        <ol class="signal-stream" id="signalList"></ol>
+      </section>
+
+      <!-- 成果工作台 -->
+      <section class="block workbench" id="workbench">
+        <div class="block-head">
+          <div>
+            <p class="eyebrow">成果工作台</p>
+            <h2 id="workbenchTitle">成果转化</h2>
+            <p class="lede">先想清楚"派什么用场"，再选成果载体。每档成果都从一句判断式标题开始。</p>
+          </div>
+          <div class="block-tools tabs" id="outputTabs" role="tablist" aria-label="成果类型">
+            <button class="tab active" type="button" data-output="brief">社情民意</button>
+            <button class="tab" type="button" data-output="proposal">提案建议</button>
+            <button class="tab" type="button" data-output="research">参政议政课题</button>
           </div>
         </div>
         <div class="workbench-grid">
-          <article class="active-cut" id="activeCut"></article>
-          <article class="draft-panel" id="draftPanel"></article>
+          <article class="card pane" id="activeCut"></article>
+          <article class="card pane pane-draft" id="draftPanel"></article>
         </div>
       </section>
 
-      <section class="section-shell" id="sources">
-        <div class="section-heading">
+      <!-- 信源（次要信息下沉到底部）-->
+      <section class="block sources-block" id="sources">
+        <div class="block-head">
           <div>
-            <p class="eyebrow">Sources</p>
+            <p class="eyebrow">数据来源</p>
             <h2>公开权威信源</h2>
+            <p class="lede">一期仅采集公开发布的政策文件与权威报道，每条引用保留原始链接与发布日期。</p>
           </div>
-          <p class="section-note">一期仅使用公开权威资料，暂不采用第三方线索投稿。</p>
         </div>
         <div class="source-grid" id="sourceGrid"></div>
       </section>
+
+      <footer class="page-footer">
+        <div class="footer-inner">
+          <p class="footer-brand">参政议政赋能平台</p>
+          <p class="footer-meta">
+            <span id="metaSignals"></span>
+            <span class="dot">·</span>
+            <span id="metaTopics"></span>
+            <span class="dot">·</span>
+            <span id="metaSources"></span>
+          </p>
+          <p class="footer-note">演示版本 · 真实数据接入与人工校核留痕在后续阶段补齐</p>
+        </div>
+      </footer>
     </main>
 
     <nav class="mobile-nav" aria-label="移动端导航">
-      <a href="#radar">雷达</a>
-      <a href="#cuts">切口</a>
-      <a href="#workbench">成果</a>
-      <a href="#sources">信源</a>
+      <a href="#focus" class="m-nav-item">
+        <span class="m-icon" aria-hidden="true">⌂</span>
+        <span>关注</span>
+      </a>
+      <a href="#cuts" class="m-nav-item">
+        <span class="m-icon" aria-hidden="true">◇</span>
+        <span>切口</span>
+      </a>
+      <a href="#radar" class="m-nav-item">
+        <span class="m-icon" aria-hidden="true">∙</span>
+        <span>信号</span>
+      </a>
+      <a href="#workbench" class="m-nav-item">
+        <span class="m-icon" aria-hidden="true">▤</span>
+        <span>工作台</span>
+      </a>
     </nav>
 
     <script src="src/data.js"></script>

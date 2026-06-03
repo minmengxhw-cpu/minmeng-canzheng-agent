@@ -1,266 +1,364 @@
+/* ============================================================
+   参政议政赋能平台 · 应用逻辑
+   架构：纯前端 SPA，依赖 window.PLATFORM_DATA（来自 data.js）
+   ============================================================ */
+
+const DATA = window.PLATFORM_DATA;
+
+const OUTPUT_LABEL = {
+  brief: "社情民意信息",
+  proposal: "提案建议",
+  research: "参政议政课题",
+};
+
+const LEVEL_CLASS = {
+  "中央": "lv-central",
+  "市级": "lv-city",
+  "部委": "lv-ministry",
+  "法定公开": "lv-public",
+};
+
 const state = {
   selectedTheme: "all",
-  selectedTopicId: window.PLATFORM_DATA.topics[0].id,
+  selectedTopicId: DATA.topics[0].id,
   selectedOutput: "brief",
   search: "",
 };
 
-const themeFilter = document.querySelector("#themeFilter");
-const topicGrid = document.querySelector("#topicGrid");
-const signalList = document.querySelector("#signalList");
-const signalScope = document.querySelector("#signalScope");
-const cutGrid = document.querySelector("#cutGrid");
-const cutSearch = document.querySelector("#cutSearch");
-const activeCut = document.querySelector("#activeCut");
-const draftPanel = document.querySelector("#draftPanel");
-const outputTabs = document.querySelector("#outputTabs");
-const sourceGrid = document.querySelector("#sourceGrid");
+/* ------------------------------------------------------------
+   元素引用
+   ------------------------------------------------------------ */
 
-function init() {
-  hydrateMetrics();
-  renderThemeFilter();
-  renderSources();
-  renderAll();
-  bindEvents();
+const $ = (sel) => document.querySelector(sel);
+
+const els = {
+  themeFilter: $("#themeFilter"),
+  focusGrid: $("#focusGrid"),
+  focusEyebrow: $("#focusEyebrow"),
+  cutGrid: $("#cutGrid"),
+  cutSearch: $("#cutSearch"),
+  signalList: $("#signalList"),
+  signalScope: $("#signalScope"),
+  outputTabs: $("#outputTabs"),
+  workbenchTitle: $("#workbenchTitle"),
+  activeCut: $("#activeCut"),
+  draftPanel: $("#draftPanel"),
+  sourceGrid: $("#sourceGrid"),
+  metaSignals: $("#metaSignals"),
+  metaTopics: $("#metaTopics"),
+  metaSources: $("#metaSources"),
+};
+
+/* ------------------------------------------------------------
+   工具函数
+   ------------------------------------------------------------ */
+
+function relativeDate(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  const now = new Date();
+  const diff = Math.floor((now - d) / (1000 * 60 * 60 * 24));
+  if (diff <= 0) return "今日";
+  if (diff === 1) return "昨日";
+  if (diff < 7) return `${diff} 天前`;
+  if (diff < 30) return `${Math.floor(diff / 7)} 周前`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function hydrateMetrics() {
-  document.querySelector("#signalCount").textContent = window.PLATFORM_DATA.signals.length;
-  document.querySelector("#topicCount").textContent = window.PLATFORM_DATA.topics.length;
-  document.querySelector("#sourceCount").textContent = window.PLATFORM_DATA.sources.length;
+function levelClass(level) {
+  return LEVEL_CLASS[level] || "lv-public";
 }
+
+function getMatchedSignals(topic) {
+  return DATA.signals.filter((sig) =>
+    topic.keywords.some((kw) => sig.keywords.includes(kw))
+  );
+}
+
+function getTopicScore(topic) {
+  const matched = getMatchedSignals(topic);
+  if (!matched.length) return 60;
+  const avgIntensity =
+    matched.reduce((sum, s) => sum + s.intensity, 0) / matched.length;
+  const bonus = matched.reduce((sum, s) => {
+    if (s.level === "中央") return sum + 7;
+    if (s.level === "市级") return sum + 5;
+    if (s.level === "部委") return sum + 4;
+    return sum + 2;
+  }, 0);
+  return Math.min(98, Math.round(avgIntensity * 0.7 + bonus));
+}
+
+function rankedTopics() {
+  return DATA.topics
+    .map((t) => ({ ...t, _score: getTopicScore(t), _matched: getMatchedSignals(t).length }))
+    .sort((a, b) => b._score - a._score);
+}
+
+function filteredTopics() {
+  return rankedTopics().filter((t) =>
+    state.selectedTheme === "all" || t.theme === state.selectedTheme
+  );
+}
+
+function filteredSignals() {
+  return DATA.signals.filter((s) =>
+    state.selectedTheme === "all" || s.theme === state.selectedTheme
+  );
+}
+
+/* ------------------------------------------------------------
+   渲染：首屏 Top 3 切口
+   ------------------------------------------------------------ */
+
+function renderFocus() {
+  const all = rankedTopics();
+  const top3 = all.slice(0, 3);
+  els.focusGrid.innerHTML = "";
+
+  // eyebrow：本周 + 当前日期
+  const now = new Date();
+  const md = `${now.getMonth() + 1} 月 ${now.getDate()} 日`;
+  els.focusEyebrow.textContent = `本周关注 · ${md}`;
+
+  top3.forEach((topic, idx) => {
+    const card = document.createElement("article");
+    card.className = "focus-card";
+    card.tabIndex = 0;
+    card.innerHTML = `
+      <span class="rank">${String(idx + 1).padStart(2, "0")}</span>
+      <span class="theme">${topic.theme}</span>
+      <h3>${topic.cut}</h3>
+      <p class="focus-thesis">${topic.thesis}</p>
+      <div class="focus-meta">
+        <span>${topic._matched} 条信号匹配</span>
+        <span class="score-chip">热度 ${topic._score}</span>
+      </div>
+    `;
+    card.addEventListener("click", () => selectTopic(topic.id));
+    card.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        selectTopic(topic.id);
+      }
+    });
+    els.focusGrid.append(card);
+  });
+}
+
+/* ------------------------------------------------------------
+   渲染：切口孵化库
+   ------------------------------------------------------------ */
+
+function renderCuts() {
+  const query = state.search.toLowerCase().trim();
+  const topics = filteredTopics().filter((t) => {
+    if (!query) return true;
+    return [t.title, t.cut, t.theme, t.thesis, ...t.keywords]
+      .join(" ").toLowerCase().includes(query);
+  });
+
+  els.cutGrid.innerHTML = "";
+  if (!topics.length) {
+    els.cutGrid.innerHTML = `<p style="color:var(--ink-mute);font-size:14px;padding:24px 0;">没有匹配的切口，试试别的关键词。</p>`;
+    return;
+  }
+
+  topics.forEach((topic) => {
+    const card = document.createElement("article");
+    card.className = "cut-card";
+    const mechChips = topic.mechanism
+      .map((m) => `<span class="mech-chip">${m}</span>`)
+      .join("");
+    card.innerHTML = `
+      <div class="cut-head">
+        <div>
+          <div class="cut-theme">${topic.theme}</div>
+          <h3>${topic.cut}</h3>
+        </div>
+      </div>
+      <p class="cut-thesis">${topic.thesis}</p>
+      <div class="mechanism">${mechChips}</div>
+      <div class="cut-foot">
+        <span class="cut-score">热度 <strong>${topic._score}</strong> · ${topic._matched} 信号</span>
+        <button type="button" class="open-btn">进入工作台</button>
+      </div>
+    `;
+    card.querySelector(".open-btn").addEventListener("click", () => selectTopic(topic.id));
+    els.cutGrid.append(card);
+  });
+}
+
+/* ------------------------------------------------------------
+   渲染：信号流
+   ------------------------------------------------------------ */
+
+function renderSignals() {
+  const signals = [...filteredSignals()].sort(
+    (a, b) => (b.date || "").localeCompare(a.date || "")
+  );
+  els.signalList.innerHTML = "";
+  els.signalScope.textContent =
+    state.selectedTheme === "all" ? "全部专题" : state.selectedTheme;
+
+  signals.forEach((sig) => {
+    const li = document.createElement("li");
+    li.className = "signal-item";
+    li.innerHTML = `
+      <div class="signal-stem">
+        <div class="date">${relativeDate(sig.date)}</div>
+        <div>${sig.date || ""}</div>
+      </div>
+      <div class="signal-body">
+        <h4>${sig.title}</h4>
+        <p>${sig.summary}</p>
+        <div class="signal-meta">
+          <span class="level-chip ${levelClass(sig.level)}">${sig.level}</span>
+          <span>${sig.source}</span>
+          <span>${sig.theme}</span>
+          <a class="signal-link" href="${sig.url}" target="_blank" rel="noreferrer">查看来源 →</a>
+        </div>
+      </div>
+    `;
+    els.signalList.append(li);
+  });
+}
+
+/* ------------------------------------------------------------
+   渲染：成果工作台
+   ------------------------------------------------------------ */
+
+function renderWorkbench() {
+  const topic = DATA.topics.find((t) => t.id === state.selectedTopicId);
+  if (!topic) return;
+  els.workbenchTitle.textContent = `成果转化 · ${topic.theme}`;
+
+  // 左侧：切口与机制
+  els.activeCut.innerHTML = `
+    <div class="pane-theme">${topic.theme}</div>
+    <h3>${topic.cut}</h3>
+    <p class="pane-thesis">${topic.thesis}</p>
+    <h4>核验问题</h4>
+    <ul>${topic.verification.map((v) => `<li>${v}</li>`).join("")}</ul>
+    <h4>机制拆解</h4>
+    <ul>${topic.mechanism.map((m) => `<li>${m}</li>`).join("")}</ul>
+  `;
+
+  // 右侧：当前选中档位的草稿
+  const out = topic.outputs[state.selectedOutput];
+  const blocks = out.blocks
+    .map(
+      ([heading, body]) => `
+        <div class="draft-block">
+          <div class="label">${heading}</div>
+          <p>${body}</p>
+        </div>
+      `
+    )
+    .join("");
+  els.draftPanel.innerHTML = `
+    <div class="pane-theme">${OUTPUT_LABEL[state.selectedOutput]}</div>
+    <div class="draft-title">${out.title}</div>
+    ${blocks}
+  `;
+}
+
+/* ------------------------------------------------------------
+   渲染：信源
+   ------------------------------------------------------------ */
+
+function renderSources() {
+  els.sourceGrid.innerHTML = "";
+  DATA.sources.forEach((s) => {
+    const card = document.createElement("article");
+    card.className = "source-card";
+    card.innerHTML = `
+      <h3>${s.name}</h3>
+      <div class="source-meta">${s.type} · ${s.cadence}</div>
+      <div class="source-scope">${s.scope}</div>
+      <a href="${s.url}" target="_blank" rel="noreferrer">打开来源 →</a>
+    `;
+    els.sourceGrid.append(card);
+  });
+}
+
+/* ------------------------------------------------------------
+   渲染：页脚元数据
+   ------------------------------------------------------------ */
+
+function renderMeta() {
+  els.metaSignals.textContent = `${DATA.signals.length} 条公开信号`;
+  els.metaTopics.textContent = `${DATA.topics.length} 个候选切口`;
+  els.metaSources.textContent = `${DATA.sources.length} 个权威信源`;
+}
+
+/* ------------------------------------------------------------
+   渲染：主题筛选下拉
+   ------------------------------------------------------------ */
 
 function renderThemeFilter() {
-  const themes = [...new Set(window.PLATFORM_DATA.topics.map((topic) => topic.theme))];
+  const themes = [...new Set(DATA.topics.map((t) => t.theme))];
   themes.forEach((theme) => {
-    const option = document.createElement("option");
-    option.value = theme;
-    option.textContent = theme;
-    themeFilter.append(option);
+    const opt = document.createElement("option");
+    opt.value = theme;
+    opt.textContent = theme;
+    els.themeFilter.append(opt);
   });
 }
 
+/* ------------------------------------------------------------
+   交互：选中切口 → 进入工作台
+   ------------------------------------------------------------ */
+
+function selectTopic(topicId) {
+  state.selectedTopicId = topicId;
+  renderWorkbench();
+  const wb = document.querySelector("#workbench");
+  if (wb) wb.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+/* ------------------------------------------------------------
+   事件绑定
+   ------------------------------------------------------------ */
+
 function bindEvents() {
-  themeFilter.addEventListener("change", (event) => {
-    state.selectedTheme = event.target.value;
-    renderAll();
+  els.themeFilter.addEventListener("change", (e) => {
+    state.selectedTheme = e.target.value;
+    renderFocus();
+    renderCuts();
+    renderSignals();
   });
 
-  cutSearch.addEventListener("input", (event) => {
-    state.search = event.target.value.trim();
+  els.cutSearch.addEventListener("input", (e) => {
+    state.search = e.target.value;
     renderCuts();
   });
 
-  outputTabs.addEventListener("click", (event) => {
-    const button = event.target.closest("button[data-output]");
-    if (!button) return;
-    state.selectedOutput = button.dataset.output;
-    outputTabs.querySelectorAll(".pill").forEach((tab) => {
-      tab.classList.toggle("active", tab === button);
+  els.outputTabs.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-output]");
+    if (!btn) return;
+    state.selectedOutput = btn.dataset.output;
+    els.outputTabs.querySelectorAll(".tab").forEach((t) => {
+      t.classList.toggle("active", t === btn);
     });
     renderWorkbench();
   });
 }
 
-function renderAll() {
-  renderTopics();
-  renderSignals();
+/* ------------------------------------------------------------
+   启动
+   ------------------------------------------------------------ */
+
+function init() {
+  renderThemeFilter();
+  renderFocus();
   renderCuts();
+  renderSignals();
   renderWorkbench();
-}
-
-function getVisibleTopics() {
-  return window.PLATFORM_DATA.topics.filter((topic) => {
-    return state.selectedTheme === "all" || topic.theme === state.selectedTheme;
-  });
-}
-
-function getVisibleSignals() {
-  return window.PLATFORM_DATA.signals.filter((signal) => {
-    return state.selectedTheme === "all" || signal.theme === state.selectedTheme;
-  });
-}
-
-function getMatchedSignals(topic) {
-  return window.PLATFORM_DATA.signals.filter((signal) => {
-    return topic.keywords.some((keyword) => signal.keywords.includes(keyword));
-  });
-}
-
-function getTopicScore(topic) {
-  const matchedSignals = getMatchedSignals(topic);
-  const base = matchedSignals.reduce((total, signal) => total + signal.intensity, 0);
-  const levelBonus = matchedSignals.reduce((total, signal) => {
-    if (signal.level === "中央") return total + 8;
-    if (signal.level === "市级") return total + 6;
-    if (signal.level === "部委") return total + 5;
-    return total + 3;
-  }, 0);
-  return Math.min(98, Math.round(base / Math.max(matchedSignals.length, 1) + levelBonus));
-}
-
-function renderTopics() {
-  const topics = getVisibleTopics();
-  topicGrid.innerHTML = "";
-
-  if (!topics.some((topic) => topic.id === state.selectedTopicId) && topics[0]) {
-    state.selectedTopicId = topics[0].id;
-  }
-
-  topics.forEach((topic) => {
-    const score = getTopicScore(topic);
-    const matchedSignals = getMatchedSignals(topic);
-    const card = document.createElement("article");
-    card.className = `topic-card ${topic.id === state.selectedTopicId ? "active" : ""}`;
-    card.tabIndex = 0;
-    card.innerHTML = `
-      <div class="topic-top">
-        <h3>${topic.title}</h3>
-        <span class="tag">${topic.theme}</span>
-      </div>
-      <p class="body-copy">${topic.thesis}</p>
-      <div class="score-bar" aria-label="关注热度 ${score}">
-        <span style="width: ${score}%"></span>
-      </div>
-      <div class="meta-line">
-        <span>关注热度 ${score}</span>
-        <span>匹配信号 ${matchedSignals.length}</span>
-        <span>${topic.mechanism.slice(0, 2).join(" / ")}</span>
-      </div>
-    `;
-    card.addEventListener("click", () => selectTopic(topic.id));
-    card.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        selectTopic(topic.id);
-      }
-    });
-    topicGrid.append(card);
-  });
-}
-
-function selectTopic(topicId) {
-  state.selectedTopicId = topicId;
-  renderTopics();
-  renderWorkbench();
-  document.querySelector("#workbench").scrollIntoView({ block: "start" });
-}
-
-function renderSignals() {
-  const signals = getVisibleSignals();
-  signalList.innerHTML = "";
-  signalScope.textContent = state.selectedTheme === "all" ? "全部" : state.selectedTheme;
-
-  signals.forEach((signal) => {
-    const item = document.createElement("article");
-    item.className = "signal-item";
-    item.innerHTML = `
-      <h4>${signal.title}</h4>
-      <p>${signal.summary}</p>
-      <div class="meta-line">
-        <span class="tag blue">${signal.level}</span>
-        <span>${signal.date}</span>
-        <span>${signal.source}</span>
-      </div>
-      <div class="signal-foot">
-        <span>${signal.evidence}</span>
-        <a href="${signal.url}" target="_blank" rel="noreferrer">查看来源</a>
-      </div>
-    `;
-    signalList.append(item);
-  });
-}
-
-function renderCuts() {
-  const query = state.search.toLowerCase();
-  const topics = getVisibleTopics().filter((topic) => {
-    if (!query) return true;
-    return [topic.title, topic.cut, topic.theme, topic.thesis, ...topic.keywords]
-      .join(" ")
-      .toLowerCase()
-      .includes(query);
-  });
-
-  cutGrid.innerHTML = "";
-  topics.forEach((topic) => {
-    const score = getTopicScore(topic);
-    const card = document.createElement("article");
-    card.className = "cut-card";
-    card.innerHTML = `
-      <div class="cut-top">
-        <h3>${topic.cut}</h3>
-        <span class="tag ${score > 88 ? "red" : "gold"}">${score}分</span>
-      </div>
-      <p>${topic.thesis}</p>
-      <ul>
-        ${topic.mechanism.map((item) => `<li>${item}</li>`).join("")}
-      </ul>
-      <button type="button">进入成果转化</button>
-    `;
-    card.querySelector("button").addEventListener("click", () => selectTopic(topic.id));
-    cutGrid.append(card);
-  });
-}
-
-function renderWorkbench() {
-  const topic = window.PLATFORM_DATA.topics.find((item) => item.id === state.selectedTopicId);
-  if (!topic) return;
-
-  activeCut.innerHTML = `
-    <span class="tag">${topic.theme}</span>
-    <h3>${topic.cut}</h3>
-    <p class="body-copy">${topic.thesis}</p>
-    <h4>需核验的问题</h4>
-    <ul>
-      ${topic.verification.map((item) => `<li>${item}</li>`).join("")}
-    </ul>
-    <h4>机制拆解</h4>
-    <ul>
-      ${topic.mechanism.map((item) => `<li>${item}</li>`).join("")}
-    </ul>
-  `;
-
-  const output = topic.outputs[state.selectedOutput];
-  const outputLabel = {
-    brief: "社情民意信息",
-    proposal: "提案建议",
-    research: "参政议政课题",
-  }[state.selectedOutput];
-
-  draftPanel.innerHTML = `
-    <span class="tag blue">${outputLabel}</span>
-    <h3>${output.title}</h3>
-    ${output.blocks
-      .map(
-        ([heading, body]) => `
-          <div class="draft-block">
-            <h4>${heading}</h4>
-            <p class="body-copy">${body}</p>
-          </div>
-        `
-      )
-      .join("")}
-  `;
-}
-
-function renderSources() {
-  sourceGrid.innerHTML = "";
-  window.PLATFORM_DATA.sources.forEach((source) => {
-    const card = document.createElement("article");
-    card.className = "source-card";
-    card.innerHTML = `
-      <div class="source-top">
-        <h3>${source.name}</h3>
-        <span class="tag">${source.type}</span>
-      </div>
-      <p>${source.scope}</p>
-      <div class="meta-line">
-        <span>抓取频率：${source.cadence}</span>
-      </div>
-      <a href="${source.url}" target="_blank" rel="noreferrer">打开公开来源</a>
-    `;
-    sourceGrid.append(card);
-  });
+  renderSources();
+  renderMeta();
+  bindEvents();
 }
 
 init();
