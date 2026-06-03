@@ -1,29 +1,31 @@
 #!/usr/bin/env python3
-"""市委主要领导动向抓取脚本
+"""市委主要领导讲话/活动抓取 + 入库分析
 
-抓取范围（公开权威渠道，仅采集已公开发布的内容）：
-- 上海市人民政府门户网站 www.shanghai.gov.cn
-- 上观新闻 jfdaily.com
-- 解放日报 jfdaily.com
+数据流：
+  1. 列表页 nw2315 → 过滤含市委书记/市长的条目
+  2. 详情页 → 抓全文（.Article_content）
+  3. 辅助理解 → 摘要 + 关键论断 + 新提法 + 政策启示
+  4. 与历史对比 → 识别重点变化（持续提及 vs 新出现）
+  5. 输出 data/leaders.json
 
-输出：data/leaders.json
-- 抓取后由前端 fetch 加载（替换 data.js 中的 leader_signals mock 数据）
+输出 JSON 数组，每条字段：
+  date / leader / role / role_rank / occasion / headline
+  full_text / summary / key_points / new_phrasing / theme
+  subthemes / keywords / policy_implications
+  change_note / compared_to / source / url
 
-运行方式：
-    python3 scripts/fetch_leaders.py
-
-依赖：requests + beautifulsoup4 + python-dateutil
-    pip install requests beautifulsoup4 python-dateutil
-
-建议在用户本地配 cron 定时跑（每 6 小时 / 每日凌晨各一次）。
+运行：
+  DEEPSEEK_API_KEY=sk-xxx python3 scripts/fetch_leaders.py
 """
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 import time
 import urllib.parse
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Optional
@@ -39,31 +41,13 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "data" / "leaders.json"
 OUT.parent.mkdir(parents=True, exist_ok=True)
 
-# 市委主要领导关键词（用于识别报道是否涉及）
 LEADERS = {
     "陈吉宁": {"role": "市委书记", "rank": 1},
-    "龚正": {"role": "市长", "rank": 2},
-    # 可扩展副书记副市长
+    "龚正":   {"role": "市长",     "rank": 2},
 }
 
-# 主题分类关键词（用于把抓到的报道映射到 topics）
-THEME_KEYWORDS = {
-    "科技产业": ["科技创新", "基础研究", "人工智能", "工业软件", "成果转化", "高端产业"],
-    "开放发展": ["跨境", "出海", "进博会", "国际消费", "开放枢纽", "自贸"],
-    "民生治理": ["养老", "长护险", "民生", "社区", "教育", "医疗"],
-    "城市治理": ["城市更新", "营商环境", "数字化", "智能化"],
-    "生态环境": ["生态", "绿色", "双碳", "环保"],
-}
-
-# 候选数据源（公开渠道，按可靠性排序）
-SOURCES = [
-    {
-        "name": "上海市人民政府门户网站",
-        "kind": "gov-portal",
-        # 上海市政府门户的"要闻动态"栏目
-        "list_url": "https://www.shanghai.gov.cn/nw2315/index.html",
-        "encoding": "utf-8",
-    },
+LIST_URLS = [
+    "https://www.shanghai.gov.cn/nw2315/index.html",
 ]
 
 HEADERS = {
@@ -74,38 +58,21 @@ HEADERS = {
     "Accept-Language": "zh-CN,zh;q=0.9",
 }
 
+API_URL = "https://api.deepseek.com/v1/chat/completions"
+API_KEY = os.environ.get("DEEPSEEK_API_KEY", "sk-8d2989ca8fd449abad970937a36823d8")
+MODEL = "deepseek-v4-flash"
 
-def classify_theme(text: str) -> str:
-    """根据正文关键词分类主题。"""
-    for theme, kws in THEME_KEYWORDS.items():
-        for kw in kws:
-            if kw in text:
-                return theme
-    return "城市治理"
+SYSTEM_PROMPT = """你是民盟市委参政议政研究助理。任务：阅读市委书记或市长的一次公开讲话/活动报道全文，做结构化入库分析，输出 JSON。
 
-
-def extract_keywords(text: str, max_n: int = 4) -> List[str]:
-    """简单从文本里抽出主题关键词命中。"""
-    found: List[str] = []
-    for theme, kws in THEME_KEYWORDS.items():
-        for kw in kws:
-            if kw in text and kw not in found:
-                found.append(kw)
-            if len(found) >= max_n:
-                return found
-    return found
+判断原则：
+- 提炼"判断式"语言，不要罗列"领导强调"等套话
+- 关键论断要凝练到金句级（每条 15-25 字最佳）
+- "新提法"指本次报道中可能升级或新出现的措辞（与典型既往表述对比识别）
+- "政策启示"要从参政议政角度提供切口建议（民盟可介入的中观议题）
+- 主题分类：科技产业 / 开放发展 / 民生治理 / 城市治理 / 营商环境 / 生态环境 / 文化教育"""
 
 
-def find_leader(text: str) -> Optional[Dict]:
-    """检查报道是否提到主要领导。"""
-    for name, meta in LEADERS.items():
-        if name in text:
-            return {"leader": name, **meta}
-    return None
-
-
-def fetch_url(url: str, timeout: int = 20) -> Optional[str]:
-    """通用 GET，带 retry。"""
+def fetch(url: str, timeout: int = 20) -> Optional[str]:
     for attempt in range(2):
         try:
             r = requests.get(url, headers=HEADERS, timeout=timeout)
@@ -114,22 +81,29 @@ def fetch_url(url: str, timeout: int = 20) -> Optional[str]:
             return r.text
         except Exception as e:
             if attempt == 1:
-                print(f"  ✗ 抓取失败 {url}: {e}", file=sys.stderr)
+                print(f"    ✗ {url}: {e}", file=sys.stderr)
                 return None
             time.sleep(3)
 
 
-def parse_shanghai_gov(html: str, base_url: str) -> List[Dict]:
-    """从上海市府门户的栏目页解析条目。"""
-    soup = BeautifulSoup(html, "html.parser")
-    items: List[Dict] = []
+def find_leader(text: str) -> Optional[Dict]:
+    for name, meta in LEADERS.items():
+        if name in text:
+            return {"leader": name, **meta}
+    return None
 
-    # 通用策略：找所有 <a> + 紧邻日期文本
+
+def parse_list(html: str, base_url: str) -> List[Dict]:
+    """从列表页解析含领导的条目（标题 + 日期 + 详情 URL）"""
+    soup = BeautifulSoup(html, "html.parser")
+    out: List[Dict] = []
+    seen = set()
+
     for a in soup.find_all("a", href=True):
-        raw_text = (a.get_text(strip=True) or "").strip()
-        if len(raw_text) < 8:
+        raw = (a.get_text(strip=True) or "").strip()
+        if len(raw) < 8:
             continue
-        leader = find_leader(raw_text)
+        leader = find_leader(raw)
         if not leader:
             continue
 
@@ -138,125 +112,215 @@ def parse_shanghai_gov(html: str, base_url: str) -> List[Dict]:
             href = urllib.parse.urljoin(base_url, href)
         elif not href.startswith("http"):
             continue
+        if href in seen:
+            continue
+        seen.add(href)
 
-        # 清洗标题：去前缀"要闻"/"重要新闻"等栏目名，去结尾日期
-        title = raw_text
-        title = re.sub(r"^(要闻|重要新闻|要闻动态|图)\s*", "", title)
+        # 清洗标题
+        title = raw
+        title = re.sub(r"^(要闻|图|重要新闻)\s*", "", title)
         title = re.sub(r"\s*20\d{2}[-./]?\d{1,2}[-./]?\d{1,2}\s*$", "", title)
         title = title.strip()
 
-        # 提取日期
+        # 日期：先从 URL 路径，回退到文本
         date_str = ""
-        m = re.search(r"(20\d{2})[-./年](\d{1,2})[-./月](\d{1,2})", raw_text)
-        if not m:
-            # 从 URL 路径里看（如 /nw4411/20260603/...html）
-            m_url = re.search(r"/(20\d{2})(\d{2})(\d{2})/", href)
-            if m_url:
-                date_str = f"{m_url.group(1)}-{m_url.group(2)}-{m_url.group(3)}"
-        if not date_str and m:
-            date_str = f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
+        m_url = re.search(r"/(20\d{2})(\d{2})(\d{2})/", href)
+        if m_url:
+            date_str = f"{m_url.group(1)}-{m_url.group(2)}-{m_url.group(3)}"
+        if not date_str:
+            m = re.search(r"(20\d{2})[-./年](\d{1,2})[-./月](\d{1,2})", raw)
+            if m:
+                date_str = f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
         if not date_str:
             date_str = datetime.now().strftime("%Y-%m-%d")
 
-        theme = classify_theme(title)
-        kws = extract_keywords(title)
-
-        # occasion：从标题中提取活动场合（在领导名之前的部分）
-        occasion = ""
-        m_occ = re.search(rf"{leader['leader']}([^，。]{{0,40}})", title)
-        if m_occ:
-            occasion = m_occ.group(1).strip()[:40]
-
-        items.append({
-            "id": f"ld-gov-{abs(hash(href)) % 10000:04d}",
+        out.append({
             "date": date_str,
-            "leader": leader["leader"],
-            "role": leader["role"],
-            "role_rank": leader["rank"],
-            "occasion": occasion,
-            "headline": title[:140],
-            "summary": "",  # 留待二次抓取详情页填充
-            "theme": theme,
-            "keywords": kws,
-            "source": "上海市人民政府门户网站",
+            "leader_meta": leader,
+            "headline": title[:160],
             "url": href,
-            "change_note": "",
-            "compared_to": None,
         })
-
-    # 去重
-    seen = set()
-    uniq: List[Dict] = []
-    for it in items:
-        if it["url"] in seen:
-            continue
-        seen.add(it["url"])
-        uniq.append(it)
-    return uniq
+    return out
 
 
-def diff_with_history(new_items: List[Dict], history_path: Path) -> List[Dict]:
-    """与历史记录比对，识别同一专题下表述变化。
-    简化版：找同 leader+theme 的上一条，写入 compared_to 字段。
-    """
-    history: List[Dict] = []
-    if history_path.exists():
+def fetch_detail(url: str) -> str:
+    """抓详情页的正文文本"""
+    html = fetch(url, timeout=25)
+    if not html:
+        return ""
+    soup = BeautifulSoup(html, "html.parser")
+    for cls in ["Article_content", "article-content", "TRS_Editor", "zoomCon"]:
+        el = soup.find(class_=cls) or soup.find(id=cls)
+        if el:
+            text = el.get_text(" ", strip=True)
+            text = re.sub(r"\s+", " ", text)
+            return text
+    return ""
+
+
+def analyze(headline: str, date: str, leader: str, full_text: str) -> Dict:
+    """调辅助理解能力做入库分析"""
+    if not full_text or len(full_text) < 80:
+        return {}
+    user = f"""标题：{headline}
+日期：{date}
+领导：{leader}
+
+全文：
+{full_text[:4500]}
+
+请输出 JSON：
+{{
+  "occasion": "活动场合精炼 15 字内",
+  "summary": "核心要点摘要，3-5 句话 120-180 字",
+  "key_points": ["关键论断 1（凝练判断式）", "关键论断 2", ...],
+  "new_phrasing": ["新提法 1", "新提法 2", ...],
+  "theme": "主题（七选一）",
+  "subthemes": ["子主题"],
+  "keywords": ["关键词 1-5 个"],
+  "policy_implications": "民盟参政议政切口建议，1-2 句，60-100 字"
+}}"""
+    body = {
+        "model": MODEL,
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user},
+        ],
+        "temperature": 0.2,
+        "max_tokens": 1200,
+        "response_format": {"type": "json_object"},
+        "thinking": {"type": "disabled"},
+    }
+    for attempt in range(2):
         try:
-            history = json.loads(history_path.read_text(encoding="utf-8"))
-        except Exception:
-            history = []
+            req = urllib.request.Request(
+                API_URL,
+                data=json.dumps(body).encode("utf-8"),
+                headers={
+                    "Authorization": f"Bearer {API_KEY}",
+                    "Content-Type": "application/json",
+                },
+            )
+            r = urllib.request.urlopen(req, timeout=120).read()
+            content = json.loads(r)["choices"][0]["message"]["content"]
+            return json.loads(content)
+        except Exception as e:
+            if attempt == 1:
+                print(f"    ✗ 分析失败: {e}", file=sys.stderr)
+                return {}
+            time.sleep(3)
 
-    # 按 (leader, theme) 索引历史最近一条
-    last_by_key: Dict[tuple, Dict] = {}
-    for h in history:
-        key = (h.get("leader"), h.get("theme"))
-        if key not in last_by_key or h["date"] > last_by_key[key]["date"]:
-            last_by_key[key] = h
 
-    for it in new_items:
-        key = (it["leader"], it["theme"])
-        prev = last_by_key.get(key)
-        if prev and prev["date"] < it["date"]:
-            it["compared_to"] = {
-                "date": prev["date"],
-                "headline": prev["headline"],
-            }
-            # change_note 留给人工补，或后续接入辅助理解模型
-            if not it.get("change_note"):
-                it["change_note"] = "（待补充：与上一条相比的表述变化要点）"
+def detect_change(new: Dict, history: List[Dict]) -> Dict:
+    """与历史同 leader+theme 对比，识别重点变化"""
+    same = [h for h in history
+            if h.get("leader") == new["leader"]
+            and h.get("theme") == new.get("theme")
+            and h.get("date", "") < new.get("date", "")]
+    if not same:
+        return {"compared_to": None, "change_note": "首次入库该主题，建立基线。"}
+    prev = max(same, key=lambda x: x.get("date", ""))
 
-    return new_items
+    # 识别新提法（本次有 / 上次没有）
+    new_phr = set(new.get("new_phrasing", []))
+    old_phr = set(prev.get("new_phrasing", [])) | set(prev.get("key_points", []))
+    fresh = [p for p in new_phr if p not in old_phr]
+    fresh_text = "、".join(fresh[:3]) if fresh else "暂未识别新增表述"
+
+    return {
+        "compared_to": {
+            "date": prev["date"],
+            "headline": prev["headline"][:80],
+            "theme": prev.get("theme", ""),
+        },
+        "change_note": f"与 {prev['date']} 同主题对比，本次新增表述：{fresh_text}。",
+    }
 
 
 def main() -> int:
-    print("=== 开始抓取市委主要领导动向 ===", file=sys.stderr)
-    all_items: List[Dict] = []
+    print("=== 抓取市委主要领导讲话/活动 + 入库分析 ===", file=sys.stderr)
 
-    for src in SOURCES:
-        print(f"\n→ {src['name']}", file=sys.stderr)
-        html = fetch_url(src["list_url"])
+    # 1. 列表页扫描
+    candidates: List[Dict] = []
+    seen = set()
+    for url in LIST_URLS:
+        print(f"\n→ 列表页 {url}", file=sys.stderr)
+        html = fetch(url)
         if not html:
             continue
-        if src["kind"] == "gov-portal":
-            items = parse_shanghai_gov(html, src["list_url"])
-            print(f"  解析到 {len(items)} 条", file=sys.stderr)
-            all_items.extend(items)
+        items = parse_list(html, url)
+        for it in items:
+            if it["url"] in seen:
+                continue
+            seen.add(it["url"])
+            candidates.append(it)
+    print(f"  共发现 {len(candidates)} 条含领导关键词", file=sys.stderr)
 
-    # 排序：role_rank 升序，date 倒序
-    all_items.sort(key=lambda x: (x.get("role_rank", 9), -int(x["date"].replace("-", ""))))
+    # 读历史
+    history: List[Dict] = []
+    if OUT.exists():
+        try:
+            history = json.loads(OUT.read_text(encoding="utf-8"))
+        except Exception:
+            history = []
 
-    # 与历史比对，补 change_note + compared_to
-    all_items = diff_with_history(all_items, OUT)
+    # 2 + 3. 详情页 + 入库分析
+    results: List[Dict] = []
+    for i, c in enumerate(candidates, 1):
+        print(f"\n[{i}/{len(candidates)}] {c['date']} | {c['leader_meta']['leader']} | {c['headline'][:60]}", file=sys.stderr)
 
-    # 写出
-    OUT.write_text(json.dumps(all_items, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"\n=== 完成 === 共 {len(all_items)} 条 → {OUT}", file=sys.stderr)
+        # 跳过已分析过的（按 URL 去重）
+        existed = next((h for h in history if h.get("url") == c["url"]), None)
+        if existed and existed.get("summary"):
+            print(f"    ⏭  已有分析，复用", file=sys.stderr)
+            results.append(existed)
+            continue
 
-    if all_items:
-        print("\n样本：", file=sys.stderr)
-        for it in all_items[:3]:
-            print(f"  {it['date']} | {it['leader']} | {it['headline'][:60]}", file=sys.stderr)
+        print(f"    ↓ 抓详情页…", file=sys.stderr)
+        full = fetch_detail(c["url"])
+        if not full:
+            print(f"    ✗ 详情页无内容", file=sys.stderr)
+            continue
+        print(f"    ✓ 全文 {len(full)} 字", file=sys.stderr)
 
+        print(f"    ↓ 入库分析…", file=sys.stderr)
+        analysis = analyze(c["headline"], c["date"], c["leader_meta"]["leader"], full)
+        if not analysis:
+            print(f"    ✗ 分析失败，跳过", file=sys.stderr)
+            continue
+
+        entry = {
+            "id": f"ld-gov-{abs(hash(c['url'])) % 10000:04d}",
+            "date": c["date"],
+            "leader": c["leader_meta"]["leader"],
+            "role": c["leader_meta"]["role"],
+            "role_rank": c["leader_meta"]["rank"],
+            "occasion": analysis.get("occasion", ""),
+            "headline": c["headline"],
+            "full_text": full[:3000],  # 控制 JSON 大小
+            "summary": analysis.get("summary", ""),
+            "key_points": analysis.get("key_points", []),
+            "new_phrasing": analysis.get("new_phrasing", []),
+            "theme": analysis.get("theme", ""),
+            "subthemes": analysis.get("subthemes", []),
+            "keywords": analysis.get("keywords", []),
+            "policy_implications": analysis.get("policy_implications", ""),
+            "source": "上海市人民政府门户网站",
+            "url": c["url"],
+        }
+
+        # 4. 变化对比
+        chg = detect_change(entry, history)
+        entry.update(chg)
+
+        results.append(entry)
+        print(f"    ✓ 入库 · 主题：{entry['theme']} · 新提法：{len(entry['new_phrasing'])} 条", file=sys.stderr)
+
+    # 排序：role_rank 升序 + date 倒序
+    results.sort(key=lambda x: (x.get("role_rank", 9), -int(x["date"].replace("-", ""))))
+
+    OUT.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"\n=== 完成 === {len(results)} 条 → {OUT}", file=sys.stderr)
     return 0
 
 

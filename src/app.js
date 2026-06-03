@@ -174,17 +174,63 @@ async function renderLeaders() {
     const sourceKindTag = sig._source_kind === "real"
       ? `<span class="src-kind src-real">实抓</span>`
       : `<span class="src-kind src-mock">演示</span>`;
+
+    // 新提法 = 重点变化（用户特别强调的最高优先级）
+    const newPhrasing = sig.new_phrasing || [];
+    const newPhrasingBlock = newPhrasing.length
+      ? `
+        <div class="leader-newphrase">
+          <div class="np-label">重点变化 · 新提法 ${newPhrasing.length}</div>
+          <ul class="np-list">
+            ${newPhrasing.map((p) => `<li>${p}</li>`).join("")}
+          </ul>
+        </div>
+      `
+      : "";
+
+    // 关键论断（折叠展示）
+    const keyPoints = sig.key_points || [];
+    const keyPointsBlock = keyPoints.length
+      ? `
+        <details class="leader-keypoints">
+          <summary><span class="kp-label">关键论断</span> · 共 ${keyPoints.length} 条</summary>
+          <ul class="kp-list">
+            ${keyPoints.map((p) => `<li>${p}</li>`).join("")}
+          </ul>
+        </details>
+      `
+      : "";
+
+    // 政策启示（参政议政切口建议）
+    const implications = sig.policy_implications
+      ? `
+        <div class="leader-implications">
+          <div class="impl-label">参政议政切口建议</div>
+          <p>${sig.policy_implications}</p>
+        </div>
+      `
+      : "";
+
+    // 主题 chip + 关键词 chip
+    const themeChip = sig.theme
+      ? `<span class="theme-chip">${sig.theme}</span>`
+      : "";
+
     card.innerHTML = `
       <div class="leader-meta">
         <span class="leader-name">${sig.leader} ${sourceKindTag}</span>
         <span class="leader-role">${sig.role}</span>
         <span class="leader-date">${sig.date}</span>
         <span class="leader-occasion">${sig.occasion || ""}</span>
+        ${themeChip}
       </div>
       <div class="leader-body">
         <h3 class="leader-headline">${sig.headline}</h3>
         <p class="leader-summary">${sig.summary || ""}</p>
+        ${newPhrasingBlock}
         ${changeBlock}
+        ${keyPointsBlock}
+        ${implications}
         <div class="leader-foot">
           ${kwHtml}
           <a href="${sig.url}" target="_blank" rel="noreferrer">查看来源 →</a>
