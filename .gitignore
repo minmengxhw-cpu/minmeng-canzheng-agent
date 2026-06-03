@@ -4,3 +4,4 @@ dist/
 output/
 .env
 .env.*
+data/fetch_leaders.log
