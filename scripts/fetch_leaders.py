@@ -46,8 +46,11 @@ LEADERS = {
     "龚正":   {"role": "市长",     "rank": 2},
 }
 
+# 列表页：nw2315 要闻动态 + 翻页（含历史）
 LIST_URLS = [
     "https://www.shanghai.gov.cn/nw2315/index.html",
+    # 翻页 URL 形态：index_2.html ... index_30.html（按需扩展）
+    *[f"https://www.shanghai.gov.cn/nw2315/index_{i}.html" for i in range(2, 11)],
 ]
 
 HEADERS = {
@@ -94,7 +97,9 @@ def find_leader(text: str) -> Optional[Dict]:
 
 
 def parse_list(html: str, base_url: str) -> List[Dict]:
-    """从列表页解析含领导的条目（标题 + 日期 + 详情 URL）"""
+    """从列表页解析所有要闻条目（宽口径，不在标题过滤领导）。
+    实际是否含领导讲话由 detail_has_leader 在详情页判断。
+    """
     soup = BeautifulSoup(html, "html.parser")
     out: List[Dict] = []
     seen = set()
@@ -103,14 +108,14 @@ def parse_list(html: str, base_url: str) -> List[Dict]:
         raw = (a.get_text(strip=True) or "").strip()
         if len(raw) < 8:
             continue
-        leader = find_leader(raw)
-        if not leader:
-            continue
 
         href = a["href"]
         if href.startswith("/"):
             href = urllib.parse.urljoin(base_url, href)
         elif not href.startswith("http"):
+            continue
+        # 只要详情页路径（含 /nwXXXX/YYYYMMDD/ 形态）
+        if not re.search(r"/nw\d+/\d{8}/", href):
             continue
         if href in seen:
             continue
@@ -136,11 +141,25 @@ def parse_list(html: str, base_url: str) -> List[Dict]:
 
         out.append({
             "date": date_str,
-            "leader_meta": leader,
             "headline": title[:160],
             "url": href,
         })
     return out
+
+
+def detail_has_leader(full_text: str) -> Optional[Dict]:
+    """详情页全文里查领导。书记优先（rank=1），其次市长（rank=2）。
+    返回最高级别命中的领导 meta；都不含则 None。
+    """
+    if not full_text or len(full_text) < 50:
+        return None
+    # 书记线索：含"陈吉宁" 或 "市委书记…陈吉宁"
+    if "陈吉宁" in full_text:
+        return {"leader": "陈吉宁", **LEADERS["陈吉宁"]}
+    # 市长线索：含"龚正" 或 "市长龚正" 或 "市委副书记、市长龚正"
+    if "龚正" in full_text:
+        return {"leader": "龚正", **LEADERS["龚正"]}
+    return None
 
 
 def fetch_detail(url: str) -> str:
@@ -240,7 +259,7 @@ def detect_change(new: Dict, history: List[Dict]) -> Dict:
 def main() -> int:
     print("=== 抓取市委主要领导讲话/活动 + 入库分析 ===", file=sys.stderr)
 
-    # 1. 列表页扫描
+    # 1. 列表页扫描（宽口径）
     candidates: List[Dict] = []
     seen = set()
     for url in LIST_URLS:
@@ -249,12 +268,15 @@ def main() -> int:
         if not html:
             continue
         items = parse_list(html, url)
+        new_n = 0
         for it in items:
             if it["url"] in seen:
                 continue
             seen.add(it["url"])
             candidates.append(it)
-    print(f"  共发现 {len(candidates)} 条含领导关键词", file=sys.stderr)
+            new_n += 1
+        print(f"  本页新增 {new_n} 条要闻（累计 {len(candidates)}）", file=sys.stderr)
+    print(f"\n共扫描到 {len(candidates)} 条要闻 → 进入详情页二次过滤", file=sys.stderr)
 
     # 读历史
     history: List[Dict] = []
@@ -264,27 +286,37 @@ def main() -> int:
         except Exception:
             history = []
 
-    # 2 + 3. 详情页 + 入库分析
-    results: List[Dict] = []
-    for i, c in enumerate(candidates, 1):
-        print(f"\n[{i}/{len(candidates)}] {c['date']} | {c['leader_meta']['leader']} | {c['headline'][:60]}", file=sys.stderr)
+    history_urls = {h.get("url"): h for h in history if h.get("url")}
 
-        # 跳过已分析过的（按 URL 去重）
-        existed = next((h for h in history if h.get("url") == c["url"]), None)
-        if existed and existed.get("summary"):
-            print(f"    ⏭  已有分析，复用", file=sys.stderr)
-            results.append(existed)
+    # 2 + 3. 详情页过滤 + 入库分析
+    results: List[Dict] = []
+    skip_no_leader = 0
+    skip_existed = 0
+
+    for i, c in enumerate(candidates, 1):
+        # 跳过已分析过的（复用历史）
+        if c["url"] in history_urls and history_urls[c["url"]].get("summary"):
+            results.append(history_urls[c["url"]])
+            skip_existed += 1
             continue
 
+        print(f"\n[{i}/{len(candidates)}] {c['date']} | {c['headline'][:60]}", file=sys.stderr)
         print(f"    ↓ 抓详情页…", file=sys.stderr)
         full = fetch_detail(c["url"])
         if not full:
             print(f"    ✗ 详情页无内容", file=sys.stderr)
             continue
-        print(f"    ✓ 全文 {len(full)} 字", file=sys.stderr)
+
+        # 详情页二次过滤：必须含书记或市长
+        leader = detail_has_leader(full)
+        if not leader:
+            skip_no_leader += 1
+            print(f"    ⊘ 详情页无书记/市长讲话 ({len(full)} 字)", file=sys.stderr)
+            continue
+        print(f"    ✓ 命中 {leader['leader']} ({leader['role']}) · 全文 {len(full)} 字", file=sys.stderr)
 
         print(f"    ↓ 入库分析…", file=sys.stderr)
-        analysis = analyze(c["headline"], c["date"], c["leader_meta"]["leader"], full)
+        analysis = analyze(c["headline"], c["date"], leader["leader"], full)
         if not analysis:
             print(f"    ✗ 分析失败，跳过", file=sys.stderr)
             continue
@@ -292,9 +324,9 @@ def main() -> int:
         entry = {
             "id": f"ld-gov-{abs(hash(c['url'])) % 10000:04d}",
             "date": c["date"],
-            "leader": c["leader_meta"]["leader"],
-            "role": c["leader_meta"]["role"],
-            "role_rank": c["leader_meta"]["rank"],
+            "leader": leader["leader"],
+            "role": leader["role"],
+            "role_rank": leader["rank"],
             "occasion": analysis.get("occasion", ""),
             "headline": c["headline"],
             "full_text": full[:3000],  # 控制 JSON 大小
@@ -320,7 +352,27 @@ def main() -> int:
     results.sort(key=lambda x: (x.get("role_rank", 9), -int(x["date"].replace("-", ""))))
 
     OUT.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"\n=== 完成 === {len(results)} 条 → {OUT}", file=sys.stderr)
+    print(f"\n=== 抓取与入库分析完成 ===", file=sys.stderr)
+    print(f"  扫描要闻总数      : {len(candidates)} 条", file=sys.stderr)
+    print(f"  复用历史已分析    : {skip_existed} 条", file=sys.stderr)
+    print(f"  详情页无书记/市长 : {skip_no_leader} 条（已过滤）", file=sys.stderr)
+    print(f"  本次新入库分析    : {len(results) - skip_existed} 条", file=sys.stderr)
+    print(f"  累计入库总数      : {len(results)} 条", file=sys.stderr)
+    print(f"  输出文件          : {OUT}", file=sys.stderr)
+
+    # 按 leader 统计
+    from collections import Counter
+    by_leader = Counter(r["leader"] for r in results)
+    print(f"\n  按领导分布：", file=sys.stderr)
+    for name, n in by_leader.most_common():
+        print(f"    {name}: {n} 条", file=sys.stderr)
+
+    # 按主题统计
+    by_theme = Counter(r.get("theme", "") for r in results if r.get("theme"))
+    print(f"\n  按主题分布：", file=sys.stderr)
+    for theme, n in by_theme.most_common():
+        print(f"    {theme}: {n} 条", file=sys.stderr)
+
     return 0
 
 
