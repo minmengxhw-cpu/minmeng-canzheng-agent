@@ -60,8 +60,8 @@ SOURCES = [
     {
         "name": "上海市人民政府门户网站",
         "kind": "gov-portal",
-        # 上海市政府门户的"领导工作动态"栏目（如有变化需更新）
-        "list_url": "https://www.shanghai.gov.cn/nw31406/",
+        # 上海市政府门户的"要闻动态"栏目
+        "list_url": "https://www.shanghai.gov.cn/nw2315/index.html",
         "encoding": "utf-8",
     },
 ]
@@ -126,10 +126,10 @@ def parse_shanghai_gov(html: str, base_url: str) -> List[Dict]:
 
     # 通用策略：找所有 <a> + 紧邻日期文本
     for a in soup.find_all("a", href=True):
-        title = (a.get_text(strip=True) or "").strip()
-        if len(title) < 8:
+        raw_text = (a.get_text(strip=True) or "").strip()
+        if len(raw_text) < 8:
             continue
-        leader = find_leader(title)
+        leader = find_leader(raw_text)
         if not leader:
             continue
 
@@ -139,22 +139,33 @@ def parse_shanghai_gov(html: str, base_url: str) -> List[Dict]:
         elif not href.startswith("http"):
             continue
 
-        # 尝试在 a 的祖先节点里找日期
-        date_str = ""
-        for ancestor in [a, a.parent, getattr(a.parent, "parent", None)]:
-            if not ancestor:
-                continue
-            t = ancestor.get_text(" ", strip=True)
-            m = re.search(r"(20\d{2})[-./年](\d{1,2})[-./月](\d{1,2})", t)
-            if m:
-                date_str = f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
-                break
+        # 清洗标题：去前缀"要闻"/"重要新闻"等栏目名，去结尾日期
+        title = raw_text
+        title = re.sub(r"^(要闻|重要新闻|要闻动态|图)\s*", "", title)
+        title = re.sub(r"\s*20\d{2}[-./]?\d{1,2}[-./]?\d{1,2}\s*$", "", title)
+        title = title.strip()
 
+        # 提取日期
+        date_str = ""
+        m = re.search(r"(20\d{2})[-./年](\d{1,2})[-./月](\d{1,2})", raw_text)
+        if not m:
+            # 从 URL 路径里看（如 /nw4411/20260603/...html）
+            m_url = re.search(r"/(20\d{2})(\d{2})(\d{2})/", href)
+            if m_url:
+                date_str = f"{m_url.group(1)}-{m_url.group(2)}-{m_url.group(3)}"
+        if not date_str and m:
+            date_str = f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
         if not date_str:
             date_str = datetime.now().strftime("%Y-%m-%d")
 
         theme = classify_theme(title)
         kws = extract_keywords(title)
+
+        # occasion：从标题中提取活动场合（在领导名之前的部分）
+        occasion = ""
+        m_occ = re.search(rf"{leader['leader']}([^，。]{{0,40}})", title)
+        if m_occ:
+            occasion = m_occ.group(1).strip()[:40]
 
         items.append({
             "id": f"ld-gov-{abs(hash(href)) % 10000:04d}",
@@ -162,7 +173,8 @@ def parse_shanghai_gov(html: str, base_url: str) -> List[Dict]:
             "leader": leader["leader"],
             "role": leader["role"],
             "role_rank": leader["rank"],
-            "headline": title[:120],
+            "occasion": occasion,
+            "headline": title[:140],
             "summary": "",  # 留待二次抓取详情页填充
             "theme": theme,
             "keywords": kws,

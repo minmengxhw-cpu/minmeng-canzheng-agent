@@ -866,6 +866,26 @@ p { margin: 0; }
   font-weight: 600;
   color: var(--ink);
   letter-spacing: -0.005em;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.src-kind {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  padding: 1px 6px;
+  border-radius: 3px;
+  vertical-align: middle;
+}
+.src-kind.src-real {
+  background: #E7EFEB;
+  color: var(--level-city);
+}
+.src-kind.src-mock {
+  background: var(--line-soft);
+  color: var(--ink-mute);
 }
 
 .leader-meta .leader-role {

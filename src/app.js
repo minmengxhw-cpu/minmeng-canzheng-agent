@@ -114,9 +114,27 @@ function filteredSignals() {
    渲染：市委主要领导动向（最高优先级）
    ------------------------------------------------------------ */
 
-function renderLeaders() {
-  const items = (DATA.leader_signals || [])
-    .slice()
+async function loadLeaderSignals() {
+  // 优先用 data/leaders.json（真实抓取）；合并 data.js 的 mock 演示数据
+  let real = [];
+  try {
+    const r = await fetch("./data/leaders.json", { cache: "no-store" });
+    if (r.ok) {
+      const j = await r.json();
+      if (Array.isArray(j)) real = j;
+    }
+  } catch (e) {
+    // 加载失败回退到纯 mock
+  }
+  const mock = (DATA.leader_signals || []).map((m) => ({ ...m, _source_kind: "mock" }));
+  const realMarked = real.map((r) => ({ ...r, _source_kind: "real" }));
+  // 真实数据 url 去重，与 mock 不同 source
+  const seen = new Set(realMarked.map((r) => r.url));
+  return [...realMarked, ...mock.filter((m) => !seen.has(m.url))];
+}
+
+async function renderLeaders() {
+  const items = (await loadLeaderSignals())
     .sort((a, b) => {
       // 优先级：rank（书记 1 > 市长 2 > 其他）→ date 倒序
       const r = (a.role_rank || 9) - (b.role_rank || 9);
@@ -153,9 +171,12 @@ function renderLeaders() {
       `
       : "";
 
+    const sourceKindTag = sig._source_kind === "real"
+      ? `<span class="src-kind src-real">实抓</span>`
+      : `<span class="src-kind src-mock">演示</span>`;
     card.innerHTML = `
       <div class="leader-meta">
-        <span class="leader-name">${sig.leader}</span>
+        <span class="leader-name">${sig.leader} ${sourceKindTag}</span>
         <span class="leader-role">${sig.role}</span>
         <span class="leader-date">${sig.date}</span>
         <span class="leader-occasion">${sig.occasion || ""}</span>
