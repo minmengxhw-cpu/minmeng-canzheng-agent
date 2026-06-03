@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#FAFAF7" />
-    <title>参政议政赋能平台 · 民盟市委</title>
+    <title>CZ Agent · 民盟市委</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -12,9 +12,11 @@
       <div class="topbar-inner">
         <a class="brand" href="#">
           <span class="brand-mark"></span>
-          <span class="brand-text">参政议政赋能平台</span>
+          <span class="brand-text">CZ Agent</span>
+          <span class="brand-sub">民盟市委</span>
         </a>
         <nav class="topbar-nav" aria-label="主导航">
+          <a href="#leaders">领导动向</a>
           <a href="#focus">本周关注</a>
           <a href="#cuts">候选切口</a>
           <a href="#radar">信号雷达</a>
@@ -24,12 +26,24 @@
     </header>
 
     <main>
-      <!-- 首屏：本周三件最该看的事 -->
-      <section class="focus" id="focus">
+      <!-- 最顶：市委主要领导动向（最高优先级）-->
+      <section class="leaders" id="leaders">
         <div class="focus-head">
-          <p class="eyebrow" id="focusEyebrow">本周关注</p>
-          <h1>本周最值得关注的三个参政议政切口</h1>
-          <p class="lede">基于公开权威资料综合研判，按关注热度排序。</p>
+          <p class="eyebrow" id="leadersEyebrow">市委关注 · 最高优先</p>
+          <h1>市委主要领导近期讲话与表述变化</h1>
+          <p class="lede">追踪市委书记、市长公开活动与讲话表述，识别关注点漂移，作为参政议政切口的第一信号。</p>
+        </div>
+        <div class="leader-stream" id="leaderStream" aria-live="polite"></div>
+      </section>
+
+      <!-- 第二屏：本周三件最该看的事 -->
+      <section class="block focus" id="focus">
+        <div class="block-head">
+          <div>
+            <p class="eyebrow" id="focusEyebrow">本周关注</p>
+            <h2>本周最值得关注的三个参政议政切口</h2>
+            <p class="lede">基于市委关注点与公开权威资料综合研判，按热度排序。</p>
+          </div>
         </div>
         <div class="focus-grid" id="focusGrid" aria-live="polite"></div>
       </section>
@@ -103,7 +117,7 @@
 
       <footer class="page-footer">
         <div class="footer-inner">
-          <p class="footer-brand">参政议政赋能平台</p>
+          <p class="footer-brand">CZ Agent · 民盟市委参政议政赋能平台</p>
           <p class="footer-meta">
             <span id="metaSignals"></span>
             <span class="dot">·</span>

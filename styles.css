@@ -160,7 +160,17 @@ p { margin: 0; }
   border-radius: 2px;
 }
 
-.brand-text { letter-spacing: -0.005em; }
+.brand-text { letter-spacing: -0.005em; font-weight: 700; }
+
+.brand-sub {
+  font-size: 11px;
+  color: var(--ink-mute);
+  letter-spacing: 0.05em;
+  padding-left: 8px;
+  margin-left: 8px;
+  border-left: 1px solid var(--line);
+  font-weight: 400;
+}
 
 .topbar-nav {
   display: flex;
@@ -800,6 +810,174 @@ p { margin: 0; }
 
 @media (max-width: 380px) {
   .source-grid { grid-template-columns: 1fr; }
+}
+
+/* ============ Leaders (最高优先级 · 市委主要领导动向) ============ */
+
+.leaders {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 64px 24px 0;
+}
+
+.leaders .focus-head { max-width: 760px; margin-bottom: var(--gap-lg); }
+
+.leaders #leadersEyebrow {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.leader-stream {
+  display: grid;
+  gap: 12px;
+}
+
+.leader-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r-md);
+  padding: 22px 26px;
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 24px;
+  align-items: start;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.leader-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.leader-card.rank-2 {
+  border-left-color: #8E8E8E;
+}
+
+.leader-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 2px;
+}
+
+.leader-meta .leader-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.005em;
+}
+
+.leader-meta .leader-role {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+.leader-card.rank-2 .leader-role {
+  color: var(--ink-soft);
+}
+
+.leader-meta .leader-date {
+  font-size: 12px;
+  color: var(--ink-mute);
+  margin-top: 4px;
+}
+
+.leader-meta .leader-occasion {
+  font-size: 12px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
+.leader-body .leader-headline {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--ink);
+  margin: 0 0 10px;
+  letter-spacing: -0.005em;
+}
+
+.leader-body .leader-summary {
+  font-size: var(--t-small);
+  color: var(--ink-soft);
+  line-height: 1.7;
+  margin: 0 0 14px;
+}
+
+.leader-change {
+  background: var(--accent-soft);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+
+.leader-change .change-label {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-deep);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.leader-change .change-note {
+  font-size: 13.5px;
+  color: var(--ink);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.leader-change .change-compared {
+  font-size: 12px;
+  color: var(--ink-mute);
+  margin-top: 6px;
+  font-style: italic;
+}
+
+.leader-card .leader-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--t-tiny);
+  color: var(--ink-mute);
+  margin-top: 10px;
+}
+
+.leader-card .leader-foot .kw-chip {
+  background: var(--line-soft);
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+.leader-card .leader-foot a {
+  color: var(--accent);
+  margin-left: auto;
+}
+
+@media (max-width: 720px) {
+  .leaders { padding: 48px 18px 0; }
+  .leader-card {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 18px 20px;
+  }
+  .leader-meta {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px;
+    padding-top: 0;
+  }
+  .leader-meta .leader-date,
+  .leader-meta .leader-occasion { margin-top: 0; }
+  .leader-body .leader-headline { font-size: 16px; }
 }
 
 /* ============ Reduced motion ============ */

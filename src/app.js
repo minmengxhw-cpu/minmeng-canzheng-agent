@@ -33,6 +33,8 @@ const $ = (sel) => document.querySelector(sel);
 
 const els = {
   themeFilter: $("#themeFilter"),
+  leaderStream: $("#leaderStream"),
+  leadersEyebrow: $("#leadersEyebrow"),
   focusGrid: $("#focusGrid"),
   focusEyebrow: $("#focusEyebrow"),
   cutGrid: $("#cutGrid"),
@@ -106,6 +108,70 @@ function filteredSignals() {
   return DATA.signals.filter((s) =>
     state.selectedTheme === "all" || s.theme === state.selectedTheme
   );
+}
+
+/* ------------------------------------------------------------
+   渲染：市委主要领导动向（最高优先级）
+   ------------------------------------------------------------ */
+
+function renderLeaders() {
+  const items = (DATA.leader_signals || [])
+    .slice()
+    .sort((a, b) => {
+      // 优先级：rank（书记 1 > 市长 2 > 其他）→ date 倒序
+      const r = (a.role_rank || 9) - (b.role_rank || 9);
+      if (r !== 0) return r;
+      return (b.date || "").localeCompare(a.date || "");
+    });
+
+  if (!els.leaderStream) return;
+  els.leaderStream.innerHTML = "";
+
+  // eyebrow：含最近更新时间
+  if (items.length && els.leadersEyebrow) {
+    const latest = items[0].date;
+    els.leadersEyebrow.textContent = `市委关注 · 最高优先 · 最近更新 ${latest}`;
+  }
+
+  items.forEach((sig) => {
+    const card = document.createElement("article");
+    card.className = `leader-card rank-${sig.role_rank || 3}`;
+    const kwHtml = (sig.keywords || [])
+      .map((k) => `<span class="kw-chip">${k}</span>`)
+      .join("");
+    const changeBlock = sig.change_note
+      ? `
+        <div class="leader-change">
+          <div class="change-label">表述变化</div>
+          <p class="change-note">${sig.change_note}</p>
+          ${
+            sig.compared_to
+              ? `<p class="change-compared">对比 ${sig.compared_to.date}：${sig.compared_to.headline}</p>`
+              : ""
+          }
+        </div>
+      `
+      : "";
+
+    card.innerHTML = `
+      <div class="leader-meta">
+        <span class="leader-name">${sig.leader}</span>
+        <span class="leader-role">${sig.role}</span>
+        <span class="leader-date">${sig.date}</span>
+        <span class="leader-occasion">${sig.occasion || ""}</span>
+      </div>
+      <div class="leader-body">
+        <h3 class="leader-headline">${sig.headline}</h3>
+        <p class="leader-summary">${sig.summary || ""}</p>
+        ${changeBlock}
+        <div class="leader-foot">
+          ${kwHtml}
+          <a href="${sig.url}" target="_blank" rel="noreferrer">查看来源 →</a>
+        </div>
+      </div>
+    `;
+    els.leaderStream.append(card);
+  });
 }
 
 /* ------------------------------------------------------------
@@ -352,6 +418,7 @@ function bindEvents() {
 
 function init() {
   renderThemeFilter();
+  renderLeaders();
   renderFocus();
   renderCuts();
   renderSignals();
