@@ -1058,9 +1058,232 @@ p { margin: 0; }
   border: 1px dashed var(--accent-soft) !important;
 }
 
-.np-list-full li {
+/* 完整新提法：引言式编号列表（替代旧 chip 风格） */
+.np-quote-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border-top: 1px solid var(--accent-soft);
+}
+
+.np-quote-list li {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 14px;
+  align-items: baseline;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--accent-soft);
+  background: linear-gradient(90deg, rgba(245,232,226,0.35) 0%, rgba(255,255,255,0) 60%);
+}
+
+.np-quote-list li:last-child { border-bottom: 0; }
+
+.np-quote-num {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.np-quote-text {
+  font-family: var(--font-serif);
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/* ============ 月度主题热度趋势图 ============ */
+
+.trend-chart {
+  margin: 12px 0 24px;
+  padding: 18px 18px 14px;
   background: var(--surface);
-  border: 1px solid var(--accent-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.trend-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.trend-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.trend-sub {
+  font-size: 11.5px;
+  color: var(--ink-mute);
+}
+
+.trend-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.trend-row {
+  display: grid;
+  grid-template-columns: 60px 1fr 36px;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.trend-month-label {
+  color: var(--ink-soft);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.trend-bar {
+  display: flex;
+  height: 18px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--line-soft);
+}
+
+.trend-seg {
+  height: 100%;
+  transition: opacity 0.15s ease;
+  position: relative;
+}
+
+.trend-seg:hover {
+  opacity: 0.85;
+}
+
+.trend-seg[title]::after {
+  content: attr(title);
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: #fff;
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-size: 10.5px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 5;
+}
+
+.trend-seg:hover[title]::after {
+  opacity: 1;
+}
+
+.trend-total {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+  font-weight: 500;
+  text-align: right;
+}
+
+/* 主题色 */
+.t-城市治理 { background: #7C8B86; }
+.t-开放发展 { background: #A8623B; }
+.t-科技产业 { background: #C8634E; }
+.t-民生治理 { background: #B89C5C; }
+.t-文化教育 { background: #8A6C9E; }
+.t-营商环境 { background: #D97757; }
+.t-生态环境 { background: #5A8567; }
+.t-法治建设 { background: #6B7B8D; }
+
+.trend-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.trend-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.trend-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* ============ 新提法热词（高频 Top） ============ */
+
+.phrase-cloud {
+  margin: 14px 0 24px;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.phrase-cloud-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+
+.phrase-cloud-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.phrase-cloud-sub {
+  font-size: 11.5px;
+  color: var(--ink-mute);
+}
+
+.phrase-cloud-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.phrase-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: var(--accent-soft);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 12.5px;
+  color: var(--ink);
+  font-family: var(--font-serif);
+}
+
+.phrase-chip.size-3 { font-size: 14.5px; padding: 5px 12px; font-weight: 600; }
+.phrase-chip.size-2 { font-size: 13.5px; padding: 5px 11px; }
+.phrase-chip .freq {
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  color: var(--accent-deep);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .kp-list {

@@ -154,7 +154,118 @@ async function renderLeaders() {
   }
 
   renderLeaderFilters();
+  renderTrendChart();
+  renderPhraseCloud();
   renderLeaderTimeline();
+}
+
+/* ============ 月度主题趋势图 ============ */
+
+const THEME_ORDER = ["城市治理", "开放发展", "科技产业", "营商环境", "民生治理", "文化教育", "生态环境", "法治建设"];
+
+function renderTrendChart() {
+  const target = document.querySelector("#leaderTrend");
+  if (!target) return;
+  const items = filteredLeaders();
+  if (!items.length) { target.innerHTML = ""; return; }
+
+  // 按月分组 + 按主题统计
+  const byMonth = {};
+  items.forEach((s) => {
+    const ym = (s.date || "").slice(0, 7);
+    if (!byMonth[ym]) byMonth[ym] = { total: 0, themes: {} };
+    byMonth[ym].total += 1;
+    const t = s.theme || "未分类";
+    byMonth[ym].themes[t] = (byMonth[ym].themes[t] || 0) + 1;
+  });
+
+  const months = Object.keys(byMonth).sort();
+  const maxTotal = Math.max(...months.map((m) => byMonth[m].total));
+
+  // 当前可见主题（按全局排序，仅保留有数据的）
+  const visibleThemes = THEME_ORDER.filter((t) =>
+    months.some((m) => (byMonth[m].themes[t] || 0) > 0)
+  );
+
+  const filterLabel =
+    state.leaderRole !== "all" || state.leaderTheme !== "all" || state.leaderSearch
+      ? `（当前筛选下 ${items.length} 条）`
+      : "";
+
+  const rowsHtml = months.map((ym) => {
+    const data = byMonth[ym];
+    const widthPct = (data.total / maxTotal) * 100;
+    const segs = visibleThemes.map((t) => {
+      const n = data.themes[t] || 0;
+      if (!n) return "";
+      const segPct = (n / data.total) * 100;
+      return `<span class="trend-seg t-${t}" style="width:${segPct}%" title="${t} ${n} 条"></span>`;
+    }).join("");
+    const ymLabel = ym.replace(/^\d{4}-0?/, "") + " 月";
+    return `
+      <div class="trend-row">
+        <span class="trend-month-label">${ymLabel}</span>
+        <div class="trend-bar" style="width:${widthPct}%">${segs}</div>
+        <span class="trend-total">${data.total}</span>
+      </div>
+    `;
+  }).join("");
+
+  const legendHtml = visibleThemes.map((t) => `
+    <span class="trend-legend-item">
+      <span class="trend-legend-dot t-${t}"></span>${t}
+    </span>
+  `).join("");
+
+  target.innerHTML = `
+    <div class="trend-chart">
+      <div class="trend-head">
+        <span class="trend-title">主题热度月度趋势</span>
+        <span class="trend-sub">${filterLabel || `按月份统计 ${items.length} 条`}</span>
+      </div>
+      <div class="trend-rows">${rowsHtml}</div>
+      <div class="trend-legend">${legendHtml}</div>
+    </div>
+  `;
+}
+
+/* ============ 近期新提法 Top（按日期倒序） ============ */
+
+function renderPhraseCloud() {
+  const target = document.querySelector("#leaderPhraseCloud");
+  if (!target) return;
+  const items = filteredLeaders();
+  if (!items.length) { target.innerHTML = ""; return; }
+
+  // 收集所有新提法 + 出处，按日期倒序展示
+  const phrases = [];
+  items.forEach((s) => {
+    (s.new_phrasing || []).forEach((p) => {
+      phrases.push({ text: p, date: s.date, leader: s.leader, theme: s.theme });
+    });
+  });
+
+  if (!phrases.length) { target.innerHTML = ""; return; }
+
+  // 按日期倒序，取近 20 条
+  phrases.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const top = phrases.slice(0, 20);
+
+  // 用 chip 大小区分最新（前 5 条放大）
+  const chipsHtml = top.map((p, i) => {
+    const size = i < 3 ? "size-3" : i < 8 ? "size-2" : "";
+    return `<span class="phrase-chip ${size}" title="${p.date} · ${p.leader} · ${p.theme || ""}">${p.text}</span>`;
+  }).join("");
+
+  target.innerHTML = `
+    <div class="phrase-cloud">
+      <div class="phrase-cloud-head">
+        <span class="phrase-cloud-title">近期新提法</span>
+        <span class="phrase-cloud-sub">按日期倒序 · Top ${top.length} / 共 ${phrases.length} 条</span>
+      </div>
+      <div class="phrase-cloud-list">${chipsHtml}</div>
+    </div>
+  `;
 }
 
 function renderLeaderFilters() {
@@ -262,8 +373,15 @@ function renderLeaderCardHTML(sig) {
 
   const npFullHtml = npRest.length ? `
     <div class="card-section">
-      <div class="card-section-label">完整新提法</div>
-      <ul class="np-list np-list-full">${np.map((p) => `<li>${p}</li>`).join("")}</ul>
+      <div class="card-section-label">完整新提法 · 共 ${np.length} 条</div>
+      <ol class="np-quote-list">
+        ${np.map((p, i) => `
+          <li>
+            <span class="np-quote-num">${String(i + 1).padStart(2, "0")}</span>
+            <span class="np-quote-text">${p}</span>
+          </li>
+        `).join("")}
+      </ol>
     </div>` : "";
 
   const summaryHtml = sig.summary ? `
@@ -551,6 +669,8 @@ function bindEvents() {
       if (!btn) return;
       state.leaderRole = btn.dataset.role;
       renderLeaderFilters();
+      renderTrendChart();
+      renderPhraseCloud();
       renderLeaderTimeline();
     });
   }
@@ -560,12 +680,16 @@ function bindEvents() {
       if (!btn) return;
       state.leaderTheme = btn.dataset.theme;
       renderLeaderFilters();
+      renderTrendChart();
+      renderPhraseCloud();
       renderLeaderTimeline();
     });
   }
   if (els.leaderSearch) {
     els.leaderSearch.addEventListener("input", (e) => {
       state.leaderSearch = e.target.value;
+      renderTrendChart();
+      renderPhraseCloud();
       renderLeaderTimeline();
     });
   }
