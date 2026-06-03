@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>民盟市委参政议政赋能平台</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="header-inner">
+        <div>
+          <p class="eyebrow">一期 MVP · 公开资料自动研判</p>
+          <h1>民盟市委参政议政赋能平台</h1>
+        </div>
+        <nav class="top-nav" aria-label="主导航">
+          <a href="#radar">关注点雷达</a>
+          <a href="#cuts">切口孵化</a>
+          <a href="#workbench">成果工作台</a>
+          <a href="#sources">公开信源</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="status-strip" aria-label="平台状态">
+        <div>
+          <span class="metric-value" id="signalCount">0</span>
+          <span class="metric-label">条公开信号</span>
+        </div>
+        <div>
+          <span class="metric-value" id="topicCount">0</span>
+          <span class="metric-label">个候选专题</span>
+        </div>
+        <div>
+          <span class="metric-value" id="sourceCount">0</span>
+          <span class="metric-label">个权威信源</span>
+        </div>
+        <div class="status-note">
+          当前为演示数据版本，后续接入定时抓取、人工校核和留痕。
+        </div>
+      </section>
+
+      <section class="section-shell" id="radar">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Radar</p>
+            <h2>领导关注点与政策变化雷达</h2>
+          </div>
+          <div class="control-row">
+            <label for="themeFilter">专题筛选</label>
+            <select id="themeFilter">
+              <option value="all">全部专题</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="radar-layout">
+          <div class="topic-grid" id="topicGrid" aria-live="polite"></div>
+          <aside class="signal-panel" aria-label="公开信号流">
+            <div class="panel-heading">
+              <h3>公开信号流</h3>
+              <span id="signalScope">全部</span>
+            </div>
+            <div class="signal-list" id="signalList"></div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="section-shell" id="cuts">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Incubator</p>
+            <h2>自动切口孵化</h2>
+          </div>
+          <div class="search-box">
+            <label for="cutSearch">搜索切口</label>
+            <input id="cutSearch" type="search" placeholder="如：企业出海、长护险、入境消费" />
+          </div>
+        </div>
+        <div class="cut-grid" id="cutGrid"></div>
+      </section>
+
+      <section class="section-shell workbench" id="workbench">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Workbench</p>
+            <h2>成果转化工作台</h2>
+          </div>
+          <div class="pill-row" id="outputTabs" role="tablist" aria-label="成果类型">
+            <button class="pill active" type="button" data-output="brief">社情民意</button>
+            <button class="pill" type="button" data-output="proposal">提案建议</button>
+            <button class="pill" type="button" data-output="research">课题大纲</button>
+          </div>
+        </div>
+        <div class="workbench-grid">
+          <article class="active-cut" id="activeCut"></article>
+          <article class="draft-panel" id="draftPanel"></article>
+        </div>
+      </section>
+
+      <section class="section-shell" id="sources">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Sources</p>
+            <h2>公开权威信源</h2>
+          </div>
+          <p class="section-note">一期仅使用公开权威资料，暂不采用第三方线索投稿。</p>
+        </div>
+        <div class="source-grid" id="sourceGrid"></div>
+      </section>
+    </main>
+
+    <nav class="mobile-nav" aria-label="移动端导航">
+      <a href="#radar">雷达</a>
+      <a href="#cuts">切口</a>
+      <a href="#workbench">成果</a>
+      <a href="#sources">信源</a>
+    </nav>
+
+    <script src="src/data.js"></script>
+    <script src="src/app.js"></script>
+  </body>
+</html>
