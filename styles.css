@@ -900,6 +900,79 @@ p { margin: 0; }
   white-space: nowrap;
 }
 
+/* ============ 主体 + 侧栏 布局 ============ */
+
+/* 桌面：左右分栏（主时间轴占主导，侧栏 sticky 跟随）*/
+.leader-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 28px;
+  align-items: start;
+}
+
+.leader-main {
+  min-width: 0;
+}
+
+.leader-aside {
+  position: sticky;
+  top: 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.leader-aside::-webkit-scrollbar { width: 6px; }
+.leader-aside::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+
+/* 月度趋势折叠卡 */
+.leader-trend-wrap {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+.leader-trend-summary {
+  padding: 12px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-mute);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  background: var(--line-soft);
+  transition: background 0.15s ease;
+}
+
+.leader-trend-summary::-webkit-details-marker { display: none; }
+.leader-trend-summary:hover { background: var(--accent-soft); color: var(--accent); }
+
+.leader-trend-wrap[open] .leader-trend-summary {
+  border-bottom: 1px solid var(--line);
+}
+
+.leader-trend-wrap #leaderTrend {
+  padding: 14px;
+}
+
+/* 手机：单列纵向，主体在最上，侧栏（提法+趋势）下沉 */
+@media (max-width: 840px) {
+  .leader-layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  .leader-aside {
+    position: static;
+    max-height: none;
+    overflow-y: visible;
+    padding-right: 0;
+  }
+}
+
 /* ============ 时间轴（按月分组） ============ */
 
 .leader-timeline {

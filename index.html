@@ -42,14 +42,25 @@
           </div>
         </div>
 
-        <!-- 月度主题趋势图 -->
-        <div id="leaderTrend"></div>
+        <!-- 主体 + 侧栏布局：主体（时间轴 = 领导主要活动）在左/上，侧栏（提法/趋势）在右/下 -->
+        <div class="leader-layout">
+          <!-- 主体：按月分组的时间轴 -->
+          <div class="leader-main">
+            <div class="leader-timeline" id="leaderTimeline" aria-live="polite"></div>
+          </div>
 
-        <!-- 新提法高频 Top -->
-        <div id="leaderPhraseCloud"></div>
+          <!-- 侧栏：本月关键提法 + 月度趋势（手机版降到主体下方，趋势默认折叠）-->
+          <aside class="leader-aside">
+            <!-- 本月关键提法（曾叫 phraseCloud）-->
+            <div id="leaderPhraseCloud"></div>
 
-        <!-- 按月分组的时间轴 -->
-        <div class="leader-timeline" id="leaderTimeline" aria-live="polite"></div>
+            <!-- 月度趋势图：手机版折叠 -->
+            <details class="leader-trend-wrap" id="leaderTrendWrap">
+              <summary class="leader-trend-summary">📊 17 个月主题趋势（点开查看）</summary>
+              <div id="leaderTrend"></div>
+            </details>
+          </aside>
+        </div>
       </section>
 
       <!-- 第二屏：本周三件最该看的事 -->
