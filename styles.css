@@ -981,8 +981,159 @@ p { margin: 0; }
   margin-left: auto;
 }
 
+/* 主题 chip（小，放 meta 区） */
+.theme-chip {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--ink-soft);
+  background: var(--line-soft);
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-top: 4px;
+}
+
+/* 重点变化（新提法）—— 最显眼 */
+.leader-newphrase {
+  margin: 12px 0 10px;
+  padding: 14px 16px;
+  background: linear-gradient(180deg, #FFF6F0 0%, #FCF1EB 100%);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r-sm);
+}
+
+.leader-newphrase .np-label {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-deep);
+  font-weight: 700;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.leader-newphrase .np-label::before {
+  content: "●";
+  color: var(--accent);
+  font-size: 10px;
+}
+
+.leader-newphrase .np-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.leader-newphrase .np-list li {
+  background: var(--surface);
+  border: 1px solid var(--accent-soft);
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 13.5px;
+  color: var(--ink);
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* 关键论断（折叠） */
+.leader-keypoints {
+  margin: 10px 0;
+  padding: 10px 14px;
+  background: var(--line-soft);
+  border-radius: var(--r-sm);
+  font-size: 13px;
+}
+
+.leader-keypoints summary {
+  cursor: pointer;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+}
+
+.leader-keypoints summary::-webkit-details-marker { display: none; }
+
+.leader-keypoints summary::before {
+  content: "›";
+  color: var(--ink-mute);
+  display: inline-block;
+  transform: rotate(0deg);
+  transition: transform 0.15s ease;
+  font-weight: 700;
+}
+
+.leader-keypoints[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.leader-keypoints .kp-label {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.leader-keypoints .kp-list {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.leader-keypoints .kp-list li {
+  padding-left: 14px;
+  position: relative;
+  color: var(--ink-soft);
+  line-height: 1.6;
+  font-size: 13px;
+}
+
+.leader-keypoints .kp-list li::before {
+  content: "—";
+  position: absolute;
+  left: 0;
+  color: var(--ink-mute);
+}
+
+/* 政策启示（参政议政切口建议） */
+.leader-implications {
+  margin: 10px 0 6px;
+  padding: 12px 14px;
+  background: #ECF1EE;
+  border-left: 3px solid var(--level-city);
+  border-radius: var(--r-sm);
+}
+
+.leader-implications .impl-label {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--level-city);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.leader-implications p {
+  font-size: 13.5px;
+  color: var(--ink);
+  line-height: 1.65;
+  margin: 0;
+}
+
 @media (max-width: 720px) {
   .leaders { padding: 48px 18px 0; }
+  .leader-newphrase .np-list li { font-size: 12.5px; padding: 4px 8px; }
+  .leader-newphrase { padding: 12px 14px; }
+  .leader-implications p { font-size: 13px; }
+  .theme-chip { margin-top: 0; }
   .leader-card {
     grid-template-columns: 1fr;
     gap: 10px;
