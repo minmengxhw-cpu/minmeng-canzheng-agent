@@ -28,10 +28,22 @@
       <section class="leaders" id="leaders">
         <div class="focus-head">
           <p class="eyebrow" id="leadersEyebrow">市委关注 · 最高优先</p>
-          <h1>市委主要领导近期讲话与表述变化</h1>
+          <h1>市委主要领导讲话与表述变化</h1>
           <p class="lede">追踪市委书记、市长公开活动与讲话表述，识别关注点漂移，作为参政议政切口的第一信号。</p>
         </div>
-        <div class="leader-stream" id="leaderStream" aria-live="polite"></div>
+
+        <!-- 筛选栏 -->
+        <div class="leader-filters" id="leaderFilters">
+          <div class="filter-row" id="leaderRoleFilter" role="tablist" aria-label="领导筛选"></div>
+          <div class="filter-row" id="leaderThemeFilter" role="tablist" aria-label="主题筛选"></div>
+          <div class="filter-search">
+            <input id="leaderSearch" type="search" class="input" placeholder="搜索：场合、新提法、关键词…" />
+            <span class="filter-stat" id="leaderStat"></span>
+          </div>
+        </div>
+
+        <!-- 按月分组的时间轴 -->
+        <div class="leader-timeline" id="leaderTimeline" aria-live="polite"></div>
       </section>
 
       <!-- 第二屏：本周三件最该看的事 -->

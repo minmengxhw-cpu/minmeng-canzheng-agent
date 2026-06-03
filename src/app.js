@@ -23,6 +23,10 @@ const state = {
   selectedTopicId: DATA.topics[0].id,
   selectedOutput: "brief",
   search: "",
+  leaderRole: "all",     // all | 陈吉宁 | 龚正
+  leaderTheme: "all",
+  leaderSearch: "",
+  leaderItems: [],       // 所有 leaders 信号缓存
 };
 
 /* ------------------------------------------------------------
@@ -34,7 +38,12 @@ const $ = (sel) => document.querySelector(sel);
 const els = {
   themeFilter: $("#themeFilter"),
   leaderStream: $("#leaderStream"),
+  leaderTimeline: $("#leaderTimeline"),
   leadersEyebrow: $("#leadersEyebrow"),
+  leaderRoleFilter: $("#leaderRoleFilter"),
+  leaderThemeFilter: $("#leaderThemeFilter"),
+  leaderSearch: $("#leaderSearch"),
+  leaderStat: $("#leaderStat"),
   focusGrid: $("#focusGrid"),
   focusEyebrow: $("#focusEyebrow"),
   cutGrid: $("#cutGrid"),
@@ -134,111 +143,168 @@ async function loadLeaderSignals() {
 }
 
 async function renderLeaders() {
-  const items = (await loadLeaderSignals())
-    .sort((a, b) => {
-      // 优先级：rank（书记 1 > 市长 2 > 其他）→ date 倒序
-      const r = (a.role_rank || 9) - (b.role_rank || 9);
-      if (r !== 0) return r;
-      return (b.date || "").localeCompare(a.date || "");
-    });
+  // 加载并缓存所有信号
+  const all = (await loadLeaderSignals())
+    .filter((s) => s.date)
+    .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  state.leaderItems = all;
 
-  if (!els.leaderStream) return;
-  els.leaderStream.innerHTML = "";
-
-  // eyebrow：含最近更新时间
-  if (items.length && els.leadersEyebrow) {
-    const latest = items[0].date;
-    els.leadersEyebrow.textContent = `市委关注 · 最高优先 · 最近更新 ${latest}`;
+  if (els.leadersEyebrow && all.length) {
+    els.leadersEyebrow.textContent = `市委关注 · 共 ${all.length} 条 · 最近更新 ${all[0].date}`;
   }
 
-  items.forEach((sig) => {
-    const card = document.createElement("article");
-    card.className = `leader-card rank-${sig.role_rank || 3}`;
-    const kwHtml = (sig.keywords || [])
-      .map((k) => `<span class="kw-chip">${k}</span>`)
-      .join("");
-    const changeBlock = sig.change_note
-      ? `
-        <div class="leader-change">
-          <div class="change-label">表述变化</div>
-          <p class="change-note">${sig.change_note}</p>
-          ${
-            sig.compared_to
-              ? `<p class="change-compared">对比 ${sig.compared_to.date}：${sig.compared_to.headline}</p>`
-              : ""
-          }
+  renderLeaderFilters();
+  renderLeaderTimeline();
+}
+
+function renderLeaderFilters() {
+  if (!els.leaderRoleFilter || !els.leaderThemeFilter) return;
+  const all = state.leaderItems;
+  // 领导筛选 chips（按数量降序）
+  const byLeader = {};
+  all.forEach((s) => { byLeader[s.leader] = (byLeader[s.leader] || 0) + 1; });
+  const roles = [["all", `全部 ${all.length}`], ...Object.entries(byLeader)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([k,v]) => [k, `${k} ${v}`])];
+  els.leaderRoleFilter.innerHTML = roles.map(([k, label]) => `
+    <button type="button" class="filter-chip ${state.leaderRole === k ? "active" : ""}" data-role="${k}">${label}</button>
+  `).join("");
+
+  // 主题筛选 chips（按数量降序）
+  const byTheme = {};
+  all.forEach((s) => {
+    if (s.theme) byTheme[s.theme] = (byTheme[s.theme] || 0) + 1;
+  });
+  const themes = [["all", `全部主题`], ...Object.entries(byTheme)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([k,v]) => [k, `${k} ${v}`])];
+  els.leaderThemeFilter.innerHTML = themes.map(([k, label]) => `
+    <button type="button" class="filter-chip ${state.leaderTheme === k ? "active" : ""}" data-theme="${k}">${label}</button>
+  `).join("");
+}
+
+function filteredLeaders() {
+  const q = state.leaderSearch.toLowerCase().trim();
+  return state.leaderItems.filter((s) => {
+    if (state.leaderRole !== "all" && s.leader !== state.leaderRole) return false;
+    if (state.leaderTheme !== "all" && s.theme !== state.leaderTheme) return false;
+    if (!q) return true;
+    const hay = [
+      s.headline, s.occasion, s.summary, s.theme,
+      ...(s.new_phrasing || []), ...(s.key_points || []),
+      ...(s.keywords || []), ...(s.subthemes || []),
+    ].join(" ").toLowerCase();
+    return hay.includes(q);
+  });
+}
+
+function renderLeaderTimeline() {
+  if (!els.leaderTimeline) return;
+  const items = filteredLeaders();
+
+  if (els.leaderStat) {
+    els.leaderStat.textContent = `${items.length} / ${state.leaderItems.length} 条`;
+  }
+
+  if (!items.length) {
+    els.leaderTimeline.innerHTML = `<p class="empty-tip">没有匹配的条目，调整筛选试试。</p>`;
+    return;
+  }
+
+  // 按 YYYY-MM 分组
+  const groups = {};
+  items.forEach((s) => {
+    const ym = (s.date || "").slice(0, 7);
+    (groups[ym] = groups[ym] || []).push(s);
+  });
+  const ymsDesc = Object.keys(groups).sort().reverse();
+
+  // 默认展开：最近月（最新的那一个）+ 当筛选后只剩 <= 2 个月时全部展开
+  const expandSet = new Set(ymsDesc.slice(0, ymsDesc.length <= 2 ? ymsDesc.length : 1));
+
+  els.leaderTimeline.innerHTML = ymsDesc.map((ym) => {
+    const list = groups[ym].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    const open = expandSet.has(ym) ? "open" : "";
+    const ymLabel = ym.replace("-", "年") + "月";
+    return `
+      <details class="month-group" ${open}>
+        <summary class="month-head">
+          <span class="month-label">${ymLabel}</span>
+          <span class="month-count">${list.length} 条</span>
+        </summary>
+        <div class="month-list">
+          ${list.map(renderLeaderCardHTML).join("")}
         </div>
-      `
-      : "";
+      </details>
+    `;
+  }).join("");
+}
 
-    const sourceKindTag = sig._source_kind === "real"
-      ? `<span class="src-kind src-real">实抓</span>`
-      : `<span class="src-kind src-mock">演示</span>`;
+function renderLeaderCardHTML(sig) {
+  const np = sig.new_phrasing || [];
+  const npPreview = np.slice(0, 2);
+  const npRest = np.slice(2);
+  const npHtml = np.length ? `
+    <div class="leader-newphrase">
+      <div class="np-label">重点变化 · ${np.length}</div>
+      <ul class="np-list">
+        ${npPreview.map((p) => `<li>${p}</li>`).join("")}
+        ${npRest.length ? `<li class="np-more">+${npRest.length} 条，展开查看</li>` : ""}
+      </ul>
+    </div>` : "";
 
-    // 新提法 = 重点变化（用户特别强调的最高优先级）
-    const newPhrasing = sig.new_phrasing || [];
-    const newPhrasingBlock = newPhrasing.length
-      ? `
-        <div class="leader-newphrase">
-          <div class="np-label">重点变化 · 新提法 ${newPhrasing.length}</div>
-          <ul class="np-list">
-            ${newPhrasing.map((p) => `<li>${p}</li>`).join("")}
-          </ul>
+  const kp = sig.key_points || [];
+  const kpHtml = kp.length ? `
+    <div class="card-section">
+      <div class="card-section-label">关键论断</div>
+      <ul class="kp-list">${kp.map((p) => `<li>${p}</li>`).join("")}</ul>
+    </div>` : "";
+
+  const npFullHtml = npRest.length ? `
+    <div class="card-section">
+      <div class="card-section-label">完整新提法</div>
+      <ul class="np-list np-list-full">${np.map((p) => `<li>${p}</li>`).join("")}</ul>
+    </div>` : "";
+
+  const summaryHtml = sig.summary ? `
+    <div class="card-section">
+      <div class="card-section-label">核心要点</div>
+      <p class="card-text">${sig.summary}</p>
+    </div>` : "";
+
+  const implHtml = sig.policy_implications ? `
+    <div class="leader-implications">
+      <div class="impl-label">参政议政切口建议</div>
+      <p>${sig.policy_implications}</p>
+    </div>` : "";
+
+  const themeChip = sig.theme ? `<span class="theme-chip">${sig.theme}</span>` : "";
+  const roleClass = `rank-${sig.role_rank || 3}`;
+  const occasion = sig.occasion || "";
+
+  return `
+    <details class="leader-card ${roleClass}">
+      <summary class="leader-summary-head">
+        <div class="leader-headrow">
+          <span class="leader-name">${sig.leader}</span>
+          <span class="leader-date">${sig.date}</span>
+          ${themeChip}
         </div>
-      `
-      : "";
-
-    // 关键论断（折叠展示）
-    const keyPoints = sig.key_points || [];
-    const keyPointsBlock = keyPoints.length
-      ? `
-        <details class="leader-keypoints">
-          <summary><span class="kp-label">关键论断</span> · 共 ${keyPoints.length} 条</summary>
-          <ul class="kp-list">
-            ${keyPoints.map((p) => `<li>${p}</li>`).join("")}
-          </ul>
-        </details>
-      `
-      : "";
-
-    // 政策启示（参政议政切口建议）
-    const implications = sig.policy_implications
-      ? `
-        <div class="leader-implications">
-          <div class="impl-label">参政议政切口建议</div>
-          <p>${sig.policy_implications}</p>
-        </div>
-      `
-      : "";
-
-    // 主题 chip + 关键词 chip
-    const themeChip = sig.theme
-      ? `<span class="theme-chip">${sig.theme}</span>`
-      : "";
-
-    card.innerHTML = `
-      <div class="leader-meta">
-        <span class="leader-name">${sig.leader} ${sourceKindTag}</span>
-        <span class="leader-role">${sig.role}</span>
-        <span class="leader-date">${sig.date}</span>
-        <span class="leader-occasion">${sig.occasion || ""}</span>
-        ${themeChip}
-      </div>
-      <div class="leader-body">
         <h3 class="leader-headline">${sig.headline}</h3>
-        <p class="leader-summary">${sig.summary || ""}</p>
-        ${newPhrasingBlock}
-        ${changeBlock}
-        ${keyPointsBlock}
-        ${implications}
+        ${occasion ? `<p class="leader-occasion-line">${occasion}</p>` : ""}
+        ${npHtml}
+      </summary>
+      <div class="leader-expand">
+        ${summaryHtml}
+        ${npFullHtml}
+        ${kpHtml}
+        ${implHtml}
         <div class="leader-foot">
-          ${kwHtml}
           <a href="${sig.url}" target="_blank" rel="noreferrer">查看来源 →</a>
         </div>
       </div>
-    `;
-    els.leaderStream.append(card);
-  });
+    </details>
+  `;
 }
 
 /* ------------------------------------------------------------
@@ -477,6 +543,32 @@ function bindEvents() {
     });
     renderWorkbench();
   });
+
+  // 领导筛选 chips
+  if (els.leaderRoleFilter) {
+    els.leaderRoleFilter.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-role]");
+      if (!btn) return;
+      state.leaderRole = btn.dataset.role;
+      renderLeaderFilters();
+      renderLeaderTimeline();
+    });
+  }
+  if (els.leaderThemeFilter) {
+    els.leaderThemeFilter.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-theme]");
+      if (!btn) return;
+      state.leaderTheme = btn.dataset.theme;
+      renderLeaderFilters();
+      renderLeaderTimeline();
+    });
+  }
+  if (els.leaderSearch) {
+    els.leaderSearch.addEventListener("input", (e) => {
+      state.leaderSearch = e.target.value;
+      renderLeaderTimeline();
+    });
+  }
 }
 
 /* ------------------------------------------------------------
