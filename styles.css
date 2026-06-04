@@ -973,9 +973,141 @@ p { margin: 0; }
   }
 }
 
-/* ============ 时间轴（按月分组） ============ */
+/* ============ 时间轴：近 14 天平铺 + 历史总折叠 ============ */
 
 .leader-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* 近期区：直接平铺 */
+.recent-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.recent-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--accent);
+  margin-bottom: 4px;
+}
+
+.recent-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: 0.02em;
+}
+
+.recent-range {
+  font-size: 12px;
+  color: var(--ink-mute);
+  font-variant-numeric: tabular-nums;
+}
+
+.recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 历史总折叠 */
+.earlier-fold {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--paper);
+  overflow: hidden;
+}
+
+.earlier-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  background: var(--line-soft);
+  transition: background 0.18s ease;
+}
+
+.earlier-summary::-webkit-details-marker { display: none; }
+.earlier-summary:hover { background: var(--accent-soft); }
+
+.earlier-chev {
+  display: inline-block;
+  font-size: 12px;
+  color: var(--accent);
+  transition: transform 0.2s ease;
+}
+
+.earlier-fold[open] .earlier-chev {
+  transform: rotate(90deg);
+}
+
+.earlier-label {
+  flex: 1;
+}
+
+.earlier-count {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-mute);
+  font-variant-numeric: tabular-nums;
+}
+
+.earlier-content {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  border-top: 1px solid var(--line);
+}
+
+/* 历史区里的月份分块（不再折叠，只是小标题 + 列表）*/
+.month-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.month-block-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0;
+  padding: 6px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-mute);
+  border-bottom: 1px dashed var(--line);
+  letter-spacing: 0.02em;
+}
+
+.month-block-count {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-mute);
+  font-variant-numeric: tabular-nums;
+}
+
+.month-block-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ============ 时间轴（旧 · 按月分组折叠，保留兼容）============ */
+
+.legacy-leader-timeline {
   display: flex;
   flex-direction: column;
   gap: 14px;
