@@ -1861,6 +1861,408 @@ p { margin: 0; }
   .leader-body .leader-headline { font-size: 16px; }
 }
 
+/* ============================================================
+   领导动向 · 桌面端排版重做（2026-06-04）
+   覆盖前文旧的 .leader-card 两列网格 + 旧 phrase-cloud chip
+   设计目标：CC 文档式审美，纵向卡片，纸张层次，紧凑而非密集
+   ============================================================ */
+
+/* 容器：让 .leaders section 用更大宽度，给侧栏留充足空间 */
+.leaders {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 56px 32px 24px;
+}
+
+/* 主体 + 侧栏 grid 重定义：主体最小 560px 才能保持可读，侧栏 300px */
+.leader-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 36px;
+  align-items: start;
+  margin-top: 24px;
+}
+
+.leader-main { min-width: 0; }
+
+/* 侧栏：严格不溢出，sticky 跟随，单独卷动条 */
+.leader-aside {
+  position: sticky;
+  top: 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+}
+.leader-aside::-webkit-scrollbar { width: 6px; }
+.leader-aside::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+
+/* ============ 卡片重做：单列纵向 details ============ */
+
+/* 强制清掉旧的两列网格 */
+.leader-card.leader-card {
+  display: block;
+  grid-template-columns: none;
+  gap: 0;
+  background: var(--surface, #FFFFFF);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 10px;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.leader-card.leader-card.rank-2 {
+  border-left-color: #9AA0A6;
+}
+.leader-card.leader-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 12px rgba(204, 85, 51, 0.06);
+}
+
+/* summary 头部（点击展开区）：去掉默认箭头，自定义 */
+.leader-card > .leader-summary-head {
+  display: block;
+  padding: 18px 22px 16px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  position: relative;
+}
+.leader-card > .leader-summary-head::-webkit-details-marker { display: none; }
+.leader-card > .leader-summary-head::after {
+  content: "+";
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  font-size: 18px;
+  color: var(--ink-mute);
+  font-weight: 300;
+  transition: transform 0.2s ease, color 0.18s ease;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.leader-card[open] > .leader-summary-head::after {
+  content: "−";
+  color: var(--accent);
+}
+
+/* 头部 meta 行：身份 + 日期 + 主题 chip */
+.leader-card .leader-headrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--ink-mute);
+  flex-wrap: wrap;
+}
+.leader-card .leader-headrow .leader-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: 0.01em;
+}
+.leader-card.rank-2 .leader-headrow .leader-name {
+  color: var(--ink-soft);
+}
+.leader-card .leader-headrow .leader-date {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-mute);
+}
+.leader-card .leader-headrow .theme-chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  border-radius: 3px;
+  margin: 0;
+  letter-spacing: 0.02em;
+  font-weight: 500;
+}
+.leader-card.rank-2 .leader-headrow .theme-chip {
+  background: var(--line-soft);
+  color: var(--ink-soft);
+}
+
+/* 主标题 */
+.leader-card .leader-headline {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--ink);
+  margin: 0 0 6px;
+  letter-spacing: -0.005em;
+  padding-right: 36px;
+}
+
+/* 场合副标 */
+.leader-card .leader-occasion-line {
+  font-size: 12.5px;
+  color: var(--ink-mute);
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+
+/* 头部预览的 重点变化 块 */
+.leader-card .leader-newphrase {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  background: linear-gradient(180deg, #FFF6F0 0%, #FCF1EB 100%);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+}
+.leader-card .leader-newphrase .np-label {
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-deep);
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.leader-card .leader-newphrase .np-label::before { content: none; }
+.leader-card .leader-newphrase .np-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.leader-card .leader-newphrase .np-list li {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink);
+  font-weight: 500;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  padding-left: 12px;
+  position: relative;
+}
+.leader-card .leader-newphrase .np-list li::before {
+  content: "·";
+  position: absolute;
+  left: 2px;
+  top: 0;
+  color: var(--accent);
+  font-weight: 700;
+}
+.leader-card .leader-newphrase .np-list .np-more {
+  font-size: 11.5px;
+  color: var(--ink-mute);
+  font-weight: 400;
+  font-style: italic;
+  margin-top: 4px;
+}
+.leader-card .leader-newphrase .np-list .np-more::before { color: var(--ink-mute); }
+
+/* 展开区：summary、关键论断、完整新提法、政策启示 */
+.leader-card .leader-expand {
+  padding: 4px 22px 20px;
+  border-top: 1px dashed var(--line);
+  margin-top: 0;
+}
+.leader-card .leader-expand .card-section {
+  margin-top: 16px;
+}
+.leader-card .leader-expand .card-section-label {
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.leader-card .leader-expand .card-text {
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--ink);
+  margin: 0;
+}
+.leader-card .leader-expand .kp-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.leader-card .leader-expand .kp-list li {
+  position: relative;
+  padding-left: 14px;
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--ink);
+}
+.leader-card .leader-expand .kp-list li::before {
+  content: "—";
+  position: absolute;
+  left: 0;
+  color: var(--ink-mute);
+}
+
+/* 完整新提法编号列表（保留原 np-quote-list 样式，加点儿空间）*/
+.leader-card .leader-expand .np-quote-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border-top: 1px solid var(--accent-soft);
+}
+.leader-card .leader-expand .np-quote-list li {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 14px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--accent-soft);
+  align-items: baseline;
+}
+.leader-card .leader-expand .np-quote-num {
+  font-family: var(--font-serif, Georgia, serif);
+  font-size: 20px;
+  color: var(--accent);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.leader-card .leader-expand .np-quote-text {
+  font-family: var(--font-serif, Georgia, serif);
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+/* 政策启示 */
+.leader-card .leader-expand .leader-implications {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  background: #ECF1EE;
+  border-left: 3px solid var(--level-city, #4A6E5C);
+  border-radius: 6px;
+}
+.leader-card .leader-expand .leader-implications .impl-label {
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--level-city, #4A6E5C);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.leader-card .leader-expand .leader-implications p {
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--ink);
+  margin: 0;
+}
+
+/* 卡片底部：查看来源链接 */
+.leader-card .leader-foot {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+  display: flex;
+  justify-content: flex-end;
+}
+.leader-card .leader-foot a {
+  font-size: 12.5px;
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+.leader-card .leader-foot a:hover { text-decoration: underline; }
+
+/* ============ 右侧栏：新提法紧凑编号列表 ============ */
+
+.phrase-side {
+  background: var(--surface, #FFFFFF);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+.phrase-side-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--accent);
+  margin-bottom: 10px;
+}
+.phrase-side-eyebrow {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: 0.02em;
+}
+.phrase-side-sub {
+  font-size: 11px;
+  color: var(--ink-mute);
+}
+.phrase-side-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+.np-side-item {
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--line);
+}
+.np-side-item:last-child { border-bottom: 0; }
+.np-side-num {
+  font-family: var(--font-serif, Georgia, serif);
+  font-size: 14px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+.np-side-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.np-side-text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+  font-weight: 500;
+  word-break: break-word;
+}
+.np-side-meta {
+  font-size: 11px;
+  color: var(--ink-mute);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============ 手机端响应式（≤840px 降级单列）============ */
+@media (max-width: 840px) {
+  .leaders { padding: 36px 16px 16px; }
+  .leader-layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  .leader-aside {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+  .leader-card > .leader-summary-head { padding: 16px 18px 14px; }
+  .leader-card .leader-headline { font-size: 16px; padding-right: 32px; }
+  .leader-card .leader-expand { padding: 4px 18px 18px; }
+  .phrase-side { padding: 14px 16px; }
+}
+
 /* ============ Reduced motion ============ */
 
 @media (prefers-reduced-motion: reduce) {
