@@ -928,35 +928,55 @@ p { margin: 0; }
 .leader-aside::-webkit-scrollbar { width: 6px; }
 .leader-aside::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
 
-/* 月度趋势折叠卡 */
+/* 月度趋势折叠卡（独立全宽行，不再在侧栏里）*/
 .leader-trend-wrap {
-  background: var(--paper);
+  background: var(--surface, #FFFFFF);
   border: 1px solid var(--line);
-  border-radius: var(--r-md);
+  border-radius: 10px;
   overflow: hidden;
+  margin-top: 32px;
 }
 
 .leader-trend-summary {
-  padding: 12px 14px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink-mute);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  font-size: 14px;
   cursor: pointer;
   list-style: none;
   user-select: none;
   background: var(--line-soft);
-  transition: background 0.15s ease;
+  transition: background 0.18s ease;
 }
-
 .leader-trend-summary::-webkit-details-marker { display: none; }
-.leader-trend-summary:hover { background: var(--accent-soft); color: var(--accent); }
+.leader-trend-summary:hover { background: var(--accent-soft); }
+
+.leader-trend-summary .trend-chev {
+  font-size: 12px;
+  color: var(--accent);
+  transition: transform 0.2s ease;
+}
+.leader-trend-wrap[open] .leader-trend-summary .trend-chev {
+  transform: rotate(90deg);
+}
+.leader-trend-summary .trend-title {
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: 0.02em;
+}
+.leader-trend-summary .trend-sub {
+  font-size: 12px;
+  color: var(--ink-mute);
+  margin-left: auto;
+}
 
 .leader-trend-wrap[open] .leader-trend-summary {
   border-bottom: 1px solid var(--line);
 }
 
 .leader-trend-wrap #leaderTrend {
-  padding: 14px;
+  padding: 20px 24px;
 }
 
 /* 手机：单列纵向，主体在最上，侧栏（提法+趋势）下沉 */
@@ -1867,18 +1887,18 @@ p { margin: 0; }
    设计目标：CC 文档式审美，纵向卡片，纸张层次，紧凑而非密集
    ============================================================ */
 
-/* 容器：让 .leaders section 用更大宽度，给侧栏留充足空间 */
+/* 容器：让 .leaders section 用更宽的页面，主体占比更大 */
 .leaders {
-  max-width: 1240px;
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 56px 32px 24px;
+  padding: 56px 40px 32px;
 }
 
-/* 主体 + 侧栏 grid 重定义：主体最小 560px 才能保持可读，侧栏 300px */
+/* 主体 + 侧栏 grid：主体占主导 1fr，侧栏收窄到 280px */
 .leader-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
-  gap: 36px;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 32px;
   align-items: start;
   margin-top: 24px;
 }
