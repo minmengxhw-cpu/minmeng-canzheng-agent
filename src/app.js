@@ -224,14 +224,24 @@ function renderTrendChart() {
   const items = filteredLeaders();
   if (!items.length) { target.innerHTML = ""; return; }
 
-  // 只取当年的活动（按最新数据所在年份，不是 Date.now() 避免静态部署偏差）
-  const newestYear = (items[0].date || "").slice(0, 4);
-  const yearItems = items.filter((s) => (s.date || "").startsWith(newestYear));
-  if (!yearItems.length) { target.innerHTML = ""; return; }
+  // 滚动 12 个月：从最新数据所在月往前推 11 个月，共 12 个月
+  const newestYM = (items[0].date || "").slice(0, 7);
+  if (!newestYM) { target.innerHTML = ""; return; }
+  const [ny, nm] = newestYM.split("-").map((x) => parseInt(x, 10));
+  // 计算窗口起点（最新月 - 11 个月）
+  let startY = ny, startM = nm - 11;
+  while (startM <= 0) { startM += 12; startY -= 1; }
+  const startYM = `${startY}-${String(startM).padStart(2, "0")}`;
+
+  const windowItems = items.filter((s) => {
+    const ym = (s.date || "").slice(0, 7);
+    return ym >= startYM && ym <= newestYM;
+  });
+  if (!windowItems.length) { target.innerHTML = ""; return; }
 
   // 按月分组 + 按主题统计
   const byMonth = {};
-  yearItems.forEach((s) => {
+  windowItems.forEach((s) => {
     const ym = (s.date || "").slice(0, 7);
     if (!byMonth[ym]) byMonth[ym] = { total: 0, themes: {} };
     byMonth[ym].total += 1;
@@ -239,13 +249,18 @@ function renderTrendChart() {
     byMonth[ym].themes[t] = (byMonth[ym].themes[t] || 0) + 1;
   });
 
-  // 当年 12 个月全列（缺数据的月份显示空行）
+  // 滚动 12 个月数组生成（旧→新）
   const months = [];
-  for (let m = 1; m <= 12; m++) {
-    const ym = `${newestYear}-${String(m).padStart(2, "0")}`;
+  let cy = startY, cm = startM;
+  for (let i = 0; i < 12; i++) {
+    const ym = `${cy}-${String(cm).padStart(2, "0")}`;
     months.push(ym);
     if (!byMonth[ym]) byMonth[ym] = { total: 0, themes: {} };
+    cm += 1;
+    if (cm > 12) { cm = 1; cy += 1; }
   }
+  const yearItems = windowItems;     // 复用下面副标的变量名
+  const newestYear = `${startYM} → ${newestYM}`;
   const maxTotal = Math.max(1, ...months.map((m) => byMonth[m].total));
 
   // 当前可见主题（按全局排序，仅保留有数据的）
@@ -286,8 +301,8 @@ function renderTrendChart() {
   target.innerHTML = `
     <div class="trend-chart">
       <div class="trend-head">
-        <span class="trend-title">${newestYear} 年主题热度月度趋势</span>
-        <span class="trend-sub">${filterLabel || `当年 ${yearItems.length} 条 · 12 个月分布`}</span>
+        <span class="trend-title">近 12 个月主题热度趋势</span>
+        <span class="trend-sub">${filterLabel || `${newestYear} · 共 ${yearItems.length} 条`}</span>
       </div>
       <div class="trend-rows">${rowsHtml}</div>
       <div class="trend-legend">${legendHtml}</div>
