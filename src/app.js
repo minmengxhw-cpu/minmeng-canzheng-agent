@@ -224,9 +224,14 @@ function renderTrendChart() {
   const items = filteredLeaders();
   if (!items.length) { target.innerHTML = ""; return; }
 
+  // 只取当年的活动（按最新数据所在年份，不是 Date.now() 避免静态部署偏差）
+  const newestYear = (items[0].date || "").slice(0, 4);
+  const yearItems = items.filter((s) => (s.date || "").startsWith(newestYear));
+  if (!yearItems.length) { target.innerHTML = ""; return; }
+
   // 按月分组 + 按主题统计
   const byMonth = {};
-  items.forEach((s) => {
+  yearItems.forEach((s) => {
     const ym = (s.date || "").slice(0, 7);
     if (!byMonth[ym]) byMonth[ym] = { total: 0, themes: {} };
     byMonth[ym].total += 1;
@@ -234,8 +239,14 @@ function renderTrendChart() {
     byMonth[ym].themes[t] = (byMonth[ym].themes[t] || 0) + 1;
   });
 
-  const months = Object.keys(byMonth).sort();
-  const maxTotal = Math.max(...months.map((m) => byMonth[m].total));
+  // 当年 12 个月全列（缺数据的月份显示空行）
+  const months = [];
+  for (let m = 1; m <= 12; m++) {
+    const ym = `${newestYear}-${String(m).padStart(2, "0")}`;
+    months.push(ym);
+    if (!byMonth[ym]) byMonth[ym] = { total: 0, themes: {} };
+  }
+  const maxTotal = Math.max(1, ...months.map((m) => byMonth[m].total));
 
   // 当前可见主题（按全局排序，仅保留有数据的）
   const visibleThemes = THEME_ORDER.filter((t) =>
@@ -275,8 +286,8 @@ function renderTrendChart() {
   target.innerHTML = `
     <div class="trend-chart">
       <div class="trend-head">
-        <span class="trend-title">主题热度月度趋势</span>
-        <span class="trend-sub">${filterLabel || `按月份统计 ${items.length} 条`}</span>
+        <span class="trend-title">${newestYear} 年主题热度月度趋势</span>
+        <span class="trend-sub">${filterLabel || `当年 ${yearItems.length} 条 · 12 个月分布`}</span>
       </div>
       <div class="trend-rows">${rowsHtml}</div>
       <div class="trend-legend">${legendHtml}</div>
@@ -386,18 +397,42 @@ function renderLeaderTimeline() {
   }
 
   // 以筛选结果的最新一条为锚点，向前推 7 天（一周窗）作为"近期"区
+  // 一周内若超过 6 条，按"领导级别+反复提法+场合级别"打分取 Top 6
+  const RECENT_MAX = 6;
   const newestDate = items[0].date || "";
   const recentCutoff = shiftDate(newestDate, -7);
+  const HIGH_OCC = /全会|常委会扩大|常委会|动员|推进会|部署|启动|开幕/;
+  const MID_OCC = /调研|座谈|现场办公|审计/;
+  const scoreRecent = (s) => {
+    let score = 0;
+    if (s.leader === "陈吉宁" || s.role === "市委书记") score += 8;
+    else if (s.leader === "龚正" || s.role === "市长") score += 5;
+    const occ = (s.occasion || "") + (s.title || "") + (s.headline || "");
+    if (HIGH_OCC.test(occ)) score += 5;
+    else if (MID_OCC.test(occ)) score += 3;
+    else score += 1;
+    const np = s.new_phrasing || [];
+    score += np.length * 2;
+    np.forEach((p) => { if ((state.phraseCounts[(p || "").trim()] || 0) >= 2) score += 5; });
+    if (s.policy_implications && s.policy_implications.length > 20) score += 3;
+    return score;
+  };
+  const recentAll = items.filter((s) => (s.date || "") >= recentCutoff);
+  const recentSorted = [...recentAll].sort((a, b) => scoreRecent(b) - scoreRecent(a));
+  const recent = recentSorted.slice(0, RECENT_MAX).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const recentExtra = recentSorted.length - recent.length;
+  // earlier = 一周外 的 + 一周内被裁掉的低分项（一并入历史折叠）
+  const recentKeptUrls = new Set(recent.map((x) => x.url));
+  const earlier = items.filter((s) => !recentKeptUrls.has(s.url) && (s.date || "") < recentCutoff)
+    .concat(recentAll.filter((s) => !recentKeptUrls.has(s.url)));
 
-  const recent = items.filter((s) => (s.date || "") >= recentCutoff);
-  const earlier = items.filter((s) => (s.date || "") < recentCutoff);
-
-  // 近期区：直接平铺（不折叠，按日期降序）
+  // 近期区：直接平铺（按日期降序）
   const recentLabel = `${formatDateShort(recentCutoff)} → ${formatDateShort(newestDate)}`;
+  const recentSuffix = recentExtra > 0 ? `（按关注度 Top ${RECENT_MAX} · 另 ${recentExtra} 条已折叠到历史）` : "";
   const recentHTML = `
     <div class="recent-block">
       <div class="recent-head">
-        <span class="recent-title">近一周 · ${recent.length} 条</span>
+        <span class="recent-title">近一周 · ${recent.length} 条${recentSuffix}</span>
         <span class="recent-range">${recentLabel}</span>
       </div>
       <div class="recent-list">
@@ -889,24 +924,7 @@ function renderAIDraftHTML(kind, d) {
   `;
 }
 
-/* ------------------------------------------------------------
-   渲染：信源
-   ------------------------------------------------------------ */
-
-function renderSources() {
-  els.sourceGrid.innerHTML = "";
-  DATA.sources.forEach((s) => {
-    const card = document.createElement("article");
-    card.className = "source-card";
-    card.innerHTML = `
-      <h3>${s.name}</h3>
-      <div class="source-meta">${s.type} · ${s.cadence}</div>
-      <div class="source-scope">${s.scope}</div>
-      <a href="${s.url}" target="_blank" rel="noreferrer">打开来源 →</a>
-    `;
-    els.sourceGrid.append(card);
-  });
-}
+function renderSources() { /* 已下线：原『数据来源』section 已从首页移除 */ }
 
 /* ------------------------------------------------------------
    渲染：页脚元数据
@@ -919,7 +937,6 @@ function renderMeta() {
     ? `${leaderCount} 条领导动态`
     : `${DATA.signals.length} 条公开信号`;
   els.metaTopics.textContent = `${cutCount} 个候选切口${state.cuts.length ? "（自动生成）" : ""}`;
-  els.metaSources.textContent = `${DATA.sources.length} 个权威信源`;
 }
 
 /* ------------------------------------------------------------
