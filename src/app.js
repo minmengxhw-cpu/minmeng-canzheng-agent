@@ -29,6 +29,7 @@ const state = {
   leaderItems: [],       // 所有 leaders 信号缓存
   phraseCounts: {},      // phrase -> 累计反复次数（来自 chronology）
   cuts: [],              // 自动生成的切口（来自 cuts.json），优先于 DATA.topics
+  drafts: {},            // cut_id -> {brief, proposal, research} LLM 生成的初稿
 };
 
 /* ------------------------------------------------------------
@@ -173,9 +174,21 @@ async function loadCuts() {
   } catch (e) { return []; }
 }
 
+async function loadDrafts() {
+  try {
+    const r = await fetch("./data/drafts.json", { cache: "no-store" });
+    if (!r.ok) return {};
+    const obj = await r.json();
+    return obj && typeof obj === "object" ? obj : {};
+  } catch (e) { return {}; }
+}
+
 async function renderLeaders() {
-  // 加载并缓存所有信号 + 累计次数 + 切口
-  const [all0, counts, cuts] = await Promise.all([loadLeaderSignals(), loadPhraseCounts(), loadCuts()]);
+  // 加载并缓存所有信号 + 累计次数 + 切口 + 草稿
+  const [all0, counts, cuts, drafts] = await Promise.all([
+    loadLeaderSignals(), loadPhraseCounts(), loadCuts(), loadDrafts(),
+  ]);
+  state.drafts = drafts;
   const all = all0
     .filter((s) => s.date)
     .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
@@ -779,7 +792,7 @@ function renderWorkbench() {
     <ul>${topic.mechanism.map((m) => `<li>${m}</li>`).join("")}</ul>
   `;
 
-  // 右侧：当前选中档位的草稿
+  // 右侧：骨架 + LLM 完整初稿
   const out = topic.outputs[state.selectedOutput];
   const blocks = out.blocks
     .map(
@@ -791,10 +804,88 @@ function renderWorkbench() {
       `
     )
     .join("");
+
+  // AI 初稿（如果该切口已生成）
+  const draftBundle = state.drafts[topic.id];
+  const aiDraft = draftBundle ? draftBundle[state.selectedOutput] : null;
+  const fullDraftHtml = aiDraft && !aiDraft.error
+    ? renderAIDraftHTML(state.selectedOutput, aiDraft)
+    : (draftBundle ? "" : `
+        <div class="ai-draft-pending">
+          <span class="pending-icon">⌛</span>
+          <span>该切口的完整初稿尚未生成，每天 2 次定时任务会自动补齐。</span>
+        </div>
+      `);
+
   els.draftPanel.innerHTML = `
-    <div class="pane-theme">${OUTPUT_LABEL[state.selectedOutput]}</div>
+    <div class="pane-theme">${OUTPUT_LABEL[state.selectedOutput]} · 骨架</div>
     <div class="draft-title">${out.title}</div>
     ${blocks}
+    ${fullDraftHtml}
+  `;
+
+  // 绑定复制按钮
+  const copyBtn = els.draftPanel.querySelector(".ai-draft-copy");
+  if (copyBtn) {
+    copyBtn.addEventListener("click", () => {
+      const txt = copyBtn.dataset.text || "";
+      navigator.clipboard.writeText(txt).then(() => {
+        copyBtn.textContent = "已复制 ✓";
+        setTimeout(() => { copyBtn.textContent = "复制全文"; }, 1500);
+      });
+    });
+  }
+}
+
+function renderAIDraftHTML(kind, d) {
+  // 根据档位组装可读的初稿正文
+  let title = d.title || "—";
+  let plain = "";
+  let html = "";
+  if (kind === "brief") {
+    plain = `${title}\n\n${d.body || ""}`;
+    html = `
+      <h4 class="ai-draft-title">${title}</h4>
+      <div class="ai-draft-body">${(d.body || "").split(/\n\n+/).map(p => `<p>${p}</p>`).join("")}</div>
+    `;
+  } else if (kind === "proposal") {
+    plain = `【提案】${title}\n\n【案由】${d.by_who || ""}\n\n【主要问题】${d.problems || ""}\n\n【建议措施】${d.measures || ""}\n\n【评估与公开】${d.evaluation || ""}`;
+    html = `
+      <h4 class="ai-draft-title">${title}</h4>
+      <div class="ai-draft-section"><span class="sec-label">案由</span><p>${d.by_who || ""}</p></div>
+      <div class="ai-draft-section"><span class="sec-label">主要问题</span><div>${(d.problems || "").split(/\n\n+/).map(p => `<p>${p}</p>`).join("")}</div></div>
+      <div class="ai-draft-section"><span class="sec-label">建议措施</span><div>${(d.measures || "").split(/\n\n+/).map(p => `<p>${p}</p>`).join("")}</div></div>
+      <div class="ai-draft-section"><span class="sec-label">评估与公开</span><p>${d.evaluation || ""}</p></div>
+    `;
+  } else { // research
+    plain = `【课题】${title}\n\n【研究问题】${d.research_question || ""}\n\n【研究意义】${d.significance || ""}\n\n【调研路径】${d.approach || ""}\n\n【关键变量识别】${d.key_variables || ""}\n\n【成果结构】${d.outline || ""}`;
+    html = `
+      <h4 class="ai-draft-title">${title}</h4>
+      <div class="ai-draft-section"><span class="sec-label">研究问题</span><p>${d.research_question || ""}</p></div>
+      <div class="ai-draft-section"><span class="sec-label">研究意义</span><p>${d.significance || ""}</p></div>
+      <div class="ai-draft-section"><span class="sec-label">调研路径</span><p>${d.approach || ""}</p></div>
+      <div class="ai-draft-section"><span class="sec-label">关键变量</span><p>${d.key_variables || ""}</p></div>
+      <div class="ai-draft-section"><span class="sec-label">成果结构</span><p>${d.outline || ""}</p></div>
+    `;
+  }
+  const escaped = plain.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+  return `
+    <details class="ai-draft-wrap">
+      <summary class="ai-draft-summary">
+        <span class="ai-tag">AI 初稿</span>
+        <span class="ai-summary-title">点开查看完整初稿（${plain.length} 字 · 待人工核验）</span>
+        <span class="ai-chev">▸</span>
+      </summary>
+      <div class="ai-draft-content">
+        <div class="ai-draft-warn">
+          ⚠️ 本初稿由模型基于骨架自动生成，仅供起草参考。文中数字、案例、机构名 需要在落稿前由参政议政干部逐一核实。
+        </div>
+        ${html}
+        <div class="ai-draft-actions">
+          <button type="button" class="ai-draft-copy" data-text="${escaped}">复制全文</button>
+        </div>
+      </div>
+    </details>
   `;
 }
 

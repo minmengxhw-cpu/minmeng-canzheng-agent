@@ -2455,6 +2455,138 @@ p { margin: 0; }
   .phrase-side { padding: 14px 16px; }
 }
 
+/* ============================================================
+   D 阶段 · AI 初稿展开区（工作台 #draftPanel 底部）
+   ============================================================ */
+
+.ai-draft-wrap {
+  margin-top: 24px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #FFFAF6 0%, #FFFFFF 80%);
+}
+.ai-draft-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  background: var(--accent-soft);
+  transition: background 0.18s ease;
+}
+.ai-draft-summary::-webkit-details-marker { display: none; }
+.ai-draft-summary:hover { background: #F8E2D7; }
+.ai-tag {
+  background: var(--accent);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.ai-summary-title {
+  flex: 1;
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+.ai-chev {
+  color: var(--accent);
+  font-size: 12px;
+  transition: transform 0.2s ease;
+}
+.ai-draft-wrap[open] .ai-chev { transform: rotate(90deg); }
+
+.ai-draft-content { padding: 18px 22px 22px; }
+
+.ai-draft-warn {
+  background: #FFF6E5;
+  border-left: 3px solid #D5A23A;
+  padding: 10px 14px;
+  border-radius: 5px;
+  font-size: 12.5px;
+  color: #6B5118;
+  line-height: 1.6;
+  margin-bottom: 18px;
+}
+
+.ai-draft-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0 0 14px;
+  line-height: 1.4;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-serif, Georgia, serif);
+  letter-spacing: 0.01em;
+}
+
+.ai-draft-body p,
+.ai-draft-section p {
+  font-size: 13.5px;
+  line-height: 1.85;
+  color: var(--ink);
+  margin: 0 0 12px;
+  text-indent: 2em;
+  font-family: var(--font-serif, Georgia, serif);
+}
+
+.ai-draft-section {
+  margin-bottom: 14px;
+}
+.ai-draft-section .sec-label {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--accent-deep);
+  background: var(--accent-soft);
+  padding: 2px 8px;
+  border-radius: 3px;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.ai-draft-actions {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line);
+  display: flex;
+  gap: 10px;
+}
+.ai-draft-copy {
+  background: var(--ink);
+  color: #fff;
+  border: 0;
+  padding: 8px 16px;
+  border-radius: 5px;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+.ai-draft-copy:hover { background: #000; }
+
+.ai-draft-pending {
+  margin-top: 24px;
+  padding: 14px 18px;
+  background: var(--line-soft);
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  font-size: 12.5px;
+  color: var(--ink-mute);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pending-icon { font-size: 16px; }
+
 /* ============ Reduced motion ============ */
 
 @media (prefers-reduced-motion: reduce) {
