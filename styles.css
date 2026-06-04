@@ -126,9 +126,9 @@ p { margin: 0; }
 }
 
 .topbar-inner {
-  max-width: 1080px;
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 14px 24px;
+  padding: 14px clamp(20px, 4vw, 40px);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -187,11 +187,22 @@ p { margin: 0; }
 
 /* ============ Layout shell ============ */
 
+/* 全站统一最大宽度：1440px 居中，左右 padding 用 clamp 自适应屏宽 */
 .focus,
 .block {
-  max-width: 1080px;
+  max-width: 1440px;
   margin: 0 auto;
-  padding: var(--gap-xl) 24px 0;
+  padding: var(--gap-xl) clamp(20px, 4vw, 40px) 0;
+}
+
+/* 大屏（>1800px）允许内容到 1600px，避免 27 寸大屏过分居中 */
+@media (min-width: 1800px) {
+  .topbar-inner,
+  .focus,
+  .block,
+  .leaders {
+    max-width: 1600px;
+  }
 }
 
 .focus { padding-top: 64px; }
@@ -2177,11 +2188,11 @@ p { margin: 0; }
    设计目标：CC 文档式审美，纵向卡片，纸张层次，紧凑而非密集
    ============================================================ */
 
-/* 容器：让 .leaders section 用更宽的页面，主体占比更大 */
+/* 容器：.leaders section 跟其他 block 一致，统一限宽 */
 .leaders {
   max-width: 1440px;
   margin: 0 auto;
-  padding: 56px 40px 32px;
+  padding: 56px clamp(20px, 4vw, 40px) 32px;
 }
 
 /* 主体 + 侧栏 grid：主体占主导 1fr，侧栏收窄到 280px */
