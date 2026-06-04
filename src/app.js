@@ -247,24 +247,32 @@ function renderPhraseCloud() {
 
   if (!phrases.length) { target.innerHTML = ""; return; }
 
-  // 按日期倒序，取近 20 条
+  // 按日期倒序，取近 15 条
   phrases.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-  const top = phrases.slice(0, 20);
+  const top = phrases.slice(0, 15);
 
-  // 用 chip 大小区分最新（前 5 条放大）
-  const chipsHtml = top.map((p, i) => {
-    const size = i < 3 ? "size-3" : i < 8 ? "size-2" : "";
-    return `<span class="phrase-chip ${size}" title="${p.date} · ${p.leader} · ${p.theme || ""}">${p.text}</span>`;
+  // 编号 + 日期 + 提法的紧凑列表（侧栏窄空间适配，CC 文档式审美）
+  const listHtml = top.map((p, i) => {
+    const dateShort = (p.date || "").slice(5).replace("-", "/");
+    return `
+      <li class="np-side-item" title="${p.date} · ${p.leader} · ${p.theme || ""}">
+        <span class="np-side-num">${String(i + 1).padStart(2, "0")}</span>
+        <div class="np-side-body">
+          <div class="np-side-text">${p.text}</div>
+          <div class="np-side-meta">${dateShort} · ${p.leader === "市委书记" ? "书记" : "市长"}</div>
+        </div>
+      </li>
+    `;
   }).join("");
 
   target.innerHTML = `
-    <div class="phrase-cloud">
-      <div class="phrase-cloud-head">
-        <span class="phrase-cloud-title">近期新提法</span>
-        <span class="phrase-cloud-sub">按日期倒序 · Top ${top.length} / 共 ${phrases.length} 条</span>
+    <aside class="phrase-side">
+      <div class="phrase-side-head">
+        <span class="phrase-side-eyebrow">近期新提法</span>
+        <span class="phrase-side-sub">按日期倒序 · 取近 ${top.length} 条 / 共 ${phrases.length} 条</span>
       </div>
-      <div class="phrase-cloud-list">${chipsHtml}</div>
-    </div>
+      <ol class="phrase-side-list">${listHtml}</ol>
+    </aside>
   `;
 }
 
@@ -322,9 +330,9 @@ function renderLeaderTimeline() {
     return;
   }
 
-  // 以筛选结果的最新一条为锚点，向前推 14 天（半月窗）作为"近期"区
+  // 以筛选结果的最新一条为锚点，向前推 7 天（一周窗）作为"近期"区
   const newestDate = items[0].date || "";
-  const recentCutoff = shiftDate(newestDate, -14);
+  const recentCutoff = shiftDate(newestDate, -7);
 
   const recent = items.filter((s) => (s.date || "") >= recentCutoff);
   const earlier = items.filter((s) => (s.date || "") < recentCutoff);
@@ -334,7 +342,7 @@ function renderLeaderTimeline() {
   const recentHTML = `
     <div class="recent-block">
       <div class="recent-head">
-        <span class="recent-title">📌 近 14 天 · ${recent.length} 条</span>
+        <span class="recent-title">近一周 · ${recent.length} 条</span>
         <span class="recent-range">${recentLabel}</span>
       </div>
       <div class="recent-list">
