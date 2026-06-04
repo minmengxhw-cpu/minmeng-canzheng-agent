@@ -311,7 +311,7 @@ function filteredLeaders() {
 
 function renderLeaderTimeline() {
   if (!els.leaderTimeline) return;
-  const items = filteredLeaders();
+  const items = filteredLeaders().sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 
   if (els.leaderStat) {
     els.leaderStat.textContent = `${items.length} / ${state.leaderItems.length} 条`;
@@ -322,33 +322,78 @@ function renderLeaderTimeline() {
     return;
   }
 
-  // 按 YYYY-MM 分组
-  const groups = {};
-  items.forEach((s) => {
-    const ym = (s.date || "").slice(0, 7);
-    (groups[ym] = groups[ym] || []).push(s);
-  });
-  const ymsDesc = Object.keys(groups).sort().reverse();
+  // 以筛选结果的最新一条为锚点，向前推 14 天（半月窗）作为"近期"区
+  const newestDate = items[0].date || "";
+  const recentCutoff = shiftDate(newestDate, -14);
 
-  // 默认展开：最近月（最新的那一个）+ 当筛选后只剩 <= 2 个月时全部展开
-  const expandSet = new Set(ymsDesc.slice(0, ymsDesc.length <= 2 ? ymsDesc.length : 1));
+  const recent = items.filter((s) => (s.date || "") >= recentCutoff);
+  const earlier = items.filter((s) => (s.date || "") < recentCutoff);
 
-  els.leaderTimeline.innerHTML = ymsDesc.map((ym) => {
-    const list = groups[ym].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-    const open = expandSet.has(ym) ? "open" : "";
-    const ymLabel = ym.replace("-", "年") + "月";
-    return `
-      <details class="month-group" ${open}>
-        <summary class="month-head">
-          <span class="month-label">${ymLabel}</span>
-          <span class="month-count">${list.length} 条</span>
+  // 近期区：直接平铺（不折叠，按日期降序）
+  const recentLabel = `${formatDateShort(recentCutoff)} → ${formatDateShort(newestDate)}`;
+  const recentHTML = `
+    <div class="recent-block">
+      <div class="recent-head">
+        <span class="recent-title">📌 近 14 天 · ${recent.length} 条</span>
+        <span class="recent-range">${recentLabel}</span>
+      </div>
+      <div class="recent-list">
+        ${recent.map(renderLeaderCardHTML).join("")}
+      </div>
+    </div>
+  `;
+
+  // 历史区：所有 14 天前的活动塞进一个总折叠，里面按月分组（每月一个小标题，平铺不再嵌套折叠）
+  let earlierHTML = "";
+  if (earlier.length) {
+    const groups = {};
+    earlier.forEach((s) => {
+      const ym = (s.date || "").slice(0, 7);
+      (groups[ym] = groups[ym] || []).push(s);
+    });
+    const ymsDesc = Object.keys(groups).sort().reverse();
+    const monthsHTML = ymsDesc.map((ym) => {
+      const list = groups[ym];
+      const ymLabel = ym.replace("-", "年") + "月";
+      return `
+        <section class="month-block">
+          <h4 class="month-block-head">
+            <span>${ymLabel}</span>
+            <span class="month-block-count">${list.length} 条</span>
+          </h4>
+          <div class="month-block-list">${list.map(renderLeaderCardHTML).join("")}</div>
+        </section>
+      `;
+    }).join("");
+
+    earlierHTML = `
+      <details class="earlier-fold">
+        <summary class="earlier-summary">
+          <span class="earlier-chev">▸</span>
+          <span class="earlier-label">查看更早历史</span>
+          <span class="earlier-count">${earlier.length} 条 · ${ymsDesc.length} 个月</span>
         </summary>
-        <div class="month-list">
-          ${list.map(renderLeaderCardHTML).join("")}
-        </div>
+        <div class="earlier-content">${monthsHTML}</div>
       </details>
     `;
-  }).join("");
+  }
+
+  els.leaderTimeline.innerHTML = recentHTML + earlierHTML;
+}
+
+// 日期工具：YYYY-MM-DD ± n 天
+function shiftDate(dateStr, days) {
+  if (!dateStr) return dateStr;
+  const d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() + days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+function formatDateShort(dateStr) {
+  if (!dateStr) return "";
+  return dateStr.slice(5).replace("-", "/");
 }
 
 function renderLeaderCardHTML(sig) {
