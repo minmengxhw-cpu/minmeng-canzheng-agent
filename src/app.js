@@ -769,6 +769,7 @@ function buildCutCardEl(topic, isAuto) {
     .map((m) => `<span class="mech-chip">${m}</span>`)
     .join("");
 
+  // 工作台已隐藏 → 不再展示"进入工作台"按钮，只保留指标
   let footHtml;
   if (isAuto) {
     const sources = topic.signal_links?.length || 0;
@@ -779,12 +780,10 @@ function buildCutCardEl(topic, isAuto) {
         <span class="first-date">首发 ${firstShort}</span>
         <span class="src-count">${sources} 条来源</span>
       </span>
-      <button type="button" class="open-btn">进入工作台</button>
     `;
   } else {
     footHtml = `
       <span class="cut-score">热度 <strong>${topic._score || ""}</strong> · ${topic._matched || 0} 信号</span>
-      <button type="button" class="open-btn">进入工作台</button>
     `;
   }
   const kwChips = isAuto && (topic.keywords || []).length
@@ -803,7 +802,7 @@ function buildCutCardEl(topic, isAuto) {
     ${kwChips}
     <div class="cut-foot">${footHtml}</div>
   `;
-  card.querySelector(".open-btn").addEventListener("click", () => selectTopic(topic.id));
+  // open-btn 已下线（工作台隐藏中），不再绑定事件
   return card;
 }
 

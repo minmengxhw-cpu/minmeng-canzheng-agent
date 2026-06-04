@@ -18,7 +18,7 @@
           <a href="#focus">本周关注</a>
           <a href="#cuts">候选切口</a>
           <a href="#radar">信号雷达</a>
-          <a href="#workbench">工作台</a>
+          <a href="#workbench" hidden>工作台</a>
         </nav>
       </div>
     </header>
@@ -113,8 +113,8 @@
         <ol class="signal-stream" id="signalList"></ol>
       </section>
 
-      <!-- 成果工作台 -->
-      <section class="block workbench" id="workbench">
+      <!-- 成果工作台（暂时不显示前台，保留代码后续启用） -->
+      <section class="block workbench" id="workbench" hidden>
         <div class="block-head">
           <div>
             <p class="eyebrow">成果工作台</p>
@@ -159,7 +159,7 @@
         <span class="m-icon" aria-hidden="true">∙</span>
         <span>信号</span>
       </a>
-      <a href="#workbench" class="m-nav-item">
+      <a href="#workbench" class="m-nav-item" hidden>
         <span class="m-icon" aria-hidden="true">▤</span>
         <span>工作台</span>
       </a>
