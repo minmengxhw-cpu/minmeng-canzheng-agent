@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#FAFAF7" />
+  <title>盟易办 · 口袋履职</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- 顶栏 -->
+  <header class="appbar">
+    <div class="appbar-inner">
+      <div class="brand">
+        <span class="brand-logo">盟</span>
+        <div class="brand-text">
+          <span class="brand-name">盟易办</span>
+          <span class="brand-sub">基层盟务 · 口袋履职</span>
+        </div>
+      </div>
+      <button id="orgBtn" class="org-chip" type="button">未命名支部 ▾</button>
+    </div>
+  </header>
+
+  <!-- 主内容区 -->
+  <main id="view" class="view"></main>
+
+  <!-- 底部 Tab -->
+  <nav class="tabbar">
+    <button class="tab active" data-view="home">
+      <span class="tab-ico">◎</span><span class="tab-label">首页</span>
+    </button>
+    <button class="tab" data-view="tasks">
+      <span class="tab-ico">▤</span><span class="tab-label">年度任务</span>
+    </button>
+    <button class="tab" data-view="activity">
+      <span class="tab-ico">✦</span><span class="tab-label">办活动</span>
+    </button>
+    <button class="tab" data-view="guide">
+      <span class="tab-ico">❖</span><span class="tab-label">查指南</span>
+    </button>
+  </nav>
+
+  <script src="app.js"></script>
+</body>
+</html>
