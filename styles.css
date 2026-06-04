@@ -299,6 +299,133 @@ p { margin: 0; }
   letter-spacing: 0.02em;
 }
 
+/* ============ Focus card · 真信号驱动新增样式 ============ */
+
+.focus-card .focus-meta-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ink-mute);
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.focus-card .focus-meta-top .focus-date {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.focus-card .focus-meta-top .focus-role {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  padding: 1px 7px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.focus-card .focus-meta-top .focus-occasion {
+  color: var(--ink-mute);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.focus-card .focus-phrases {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.focus-card .focus-phrases li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 6px 8px;
+  border-radius: 5px;
+}
+.focus-card .focus-phrases .phrase-repeat {
+  background: linear-gradient(180deg, #FFF6F0 0%, #FCF1EB 100%);
+  border-left: 3px solid var(--accent);
+}
+.focus-card .focus-phrases .phrase-new {
+  background: var(--line-soft);
+  border-left: 3px solid var(--ink-mute);
+}
+.focus-card .focus-phrases .phrase-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.focus-card .focus-phrases .phrase-repeat .phrase-tag {
+  background: var(--accent);
+  color: #fff;
+}
+.focus-card .focus-phrases .phrase-new .phrase-tag {
+  background: var(--ink-mute);
+  color: #fff;
+}
+.focus-card .focus-phrases .phrase-text {
+  color: var(--ink);
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.focus-card .focus-implications {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: #ECF1EE;
+  border-left: 3px solid var(--level-city, #4A6E5C);
+  border-radius: 5px;
+}
+.focus-card .focus-implications .impl-label {
+  display: inline-block;
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  color: var(--level-city, #4A6E5C);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+.focus-card .focus-implications p {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink);
+  margin: 0;
+}
+
+.focus-card .focus-meta-bot {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--t-tiny);
+}
+.focus-card .focus-meta-bot .focus-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 12px;
+}
+.focus-card .focus-meta-bot .focus-link:hover { text-decoration: underline; }
+
+@media (max-width: 840px) {
+  .focus-grid { grid-template-columns: 1fr; }
+  .focus-card { padding: 20px; }
+}
+
 /* ============ Form controls ============ */
 
 .select,
