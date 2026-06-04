@@ -403,6 +403,16 @@ function renderLeaderTimeline() {
   const recentCutoff = shiftDate(newestDate, -7);
   const HIGH_OCC = /全会|常委会扩大|常委会|动员|推进会|部署|启动|开幕/;
   const MID_OCC = /调研|座谈|现场办公|审计/;
+  const newestMs = newestDate ? new Date(newestDate + "T00:00:00").getTime() : 0;
+  const recencyBoost = (date) => {
+    if (!date || !newestMs) return 0;
+    const days = Math.round((newestMs - new Date(date + "T00:00:00").getTime()) / 86400000);
+    if (days <= 0) return 7;
+    if (days === 1) return 5;
+    if (days === 2) return 3;
+    if (days === 3) return 1;
+    return 0;
+  };
   const scoreRecent = (s) => {
     let score = 0;
     if (s.leader === "陈吉宁" || s.role === "市委书记") score += 8;
@@ -415,6 +425,7 @@ function renderLeaderTimeline() {
     score += np.length * 2;
     np.forEach((p) => { if ((state.phraseCounts[(p || "").trim()] || 0) >= 2) score += 5; });
     if (s.policy_implications && s.policy_implications.length > 20) score += 3;
+    score += recencyBoost(s.date);
     return score;
   };
   const recentAll = items.filter((s) => (s.date || "") >= recentCutoff);
@@ -603,9 +614,20 @@ function renderFocus() {
     return;
   }
 
-  // 打分逻辑：市委书记权重最高 + 反复提法加权 + 政策启示加分 + 高优先场合加分
+  // 打分逻辑：市委书记权重最高 + 反复提法加权 + 政策启示加分 + 高优先场合加分 + 新鲜度加分
   const HIGH_OCC = /全会|常委会扩大|常委会|动员|推进会|部署|启动|开幕/;
   const MID_OCC = /调研|座谈|现场办公|审计/;
+  // 新鲜度衰减：越靠近 newest 日期分越高（避免最新动态被高优先级老条目压住）
+  const newestMs = newest ? new Date(newest + "T00:00:00").getTime() : 0;
+  const recencyBoost = (date) => {
+    if (!date || !newestMs) return 0;
+    const days = Math.round((newestMs - new Date(date + "T00:00:00").getTime()) / 86400000);
+    if (days <= 0) return 7;   // 当天
+    if (days === 1) return 5;  // 1 天前
+    if (days === 2) return 3;  // 2 天前
+    if (days === 3) return 1;  // 3 天前
+    return 0;                  // 4 天以上
+  };
   const scored = recent.map((s) => {
     let score = 0;
     if (s.leader === "陈吉宁" || s.role === "市委书记") score += 8;
@@ -624,6 +646,8 @@ function renderFocus() {
     });
     score += repeatBoost;
     if (s.policy_implications && s.policy_implications.length > 20) score += 3;
+    // 新鲜度加分：让最新一天的活动至少有机会进 Top 3
+    score += recencyBoost(s.date);
     return { ...s, _score: score, _repeatBoost: repeatBoost };
   });
 
