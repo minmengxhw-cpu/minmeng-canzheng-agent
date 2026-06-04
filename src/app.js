@@ -27,6 +27,7 @@ const state = {
   leaderTheme: "all",
   leaderSearch: "",
   leaderItems: [],       // 所有 leaders 信号缓存
+  phraseCounts: {},      // phrase -> 累计反复次数（来自 chronology）
 };
 
 /* ------------------------------------------------------------
@@ -142,12 +143,27 @@ async function loadLeaderSignals() {
   return [...realMarked, ...mock.filter((m) => !seen.has(m.url))];
 }
 
+async function loadPhraseCounts() {
+  try {
+    const r = await fetch("./data/phrase_chronology.json", { cache: "no-store" });
+    if (!r.ok) return {};
+    const arr = await r.json();
+    const map = {};
+    arr.forEach((x) => { if (x.phrase) map[x.phrase] = x.count || 1; });
+    return map;
+  } catch (e) { return {}; }
+}
+
 async function renderLeaders() {
-  // 加载并缓存所有信号
-  const all = (await loadLeaderSignals())
+  // 加载并缓存所有信号 + 累计次数
+  const [all0, counts] = await Promise.all([loadLeaderSignals(), loadPhraseCounts()]);
+  const all = all0
     .filter((s) => s.date)
     .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   state.leaderItems = all;
+  state.phraseCounts = counts;
+  // 数据就绪后重渲染依赖此数据的模块
+  renderFocus();
 
   if (els.leadersEyebrow && all.length) {
     els.leadersEyebrow.textContent = `市委关注 · 共 ${all.length} 条 · 最近更新 ${all[0].date}`;
@@ -483,35 +499,128 @@ function renderLeaderCardHTML(sig) {
    ------------------------------------------------------------ */
 
 function renderFocus() {
-  const all = rankedTopics();
-  const top3 = all.slice(0, 3);
+  if (!els.focusGrid) return;
   els.focusGrid.innerHTML = "";
 
   // eyebrow：本周 + 当前日期
   const now = new Date();
   const md = `${now.getMonth() + 1} 月 ${now.getDate()} 日`;
-  els.focusEyebrow.textContent = `本周关注 · ${md}`;
 
-  top3.forEach((topic, idx) => {
+  // 真信号驱动：从近 7 天 state.leaderItems 自动评出 Top 3
+  // state.leaderItems 还没就绪时，回退到旧的静态 topic 模式
+  if (!state.leaderItems.length) {
+    els.focusEyebrow.textContent = `本周关注 · ${md} · 加载中…`;
+    return;
+  }
+
+  if (els.focusEyebrow) {
+    els.focusEyebrow.textContent = `本周关注 · ${md} · 基于近 7 天市委活动自动研判`;
+  }
+
+  // 近 7 天的活动
+  const newest = state.leaderItems[0].date || "";
+  const d = new Date(newest + "T00:00:00");
+  d.setDate(d.getDate() - 7);
+  const cutoff = d.toISOString().slice(0, 10);
+  const recent = state.leaderItems.filter((s) => (s.date || "") >= cutoff);
+
+  if (!recent.length) {
+    els.focusGrid.innerHTML = `<p class="empty-tip">近 7 天暂无收录的市委活动。</p>`;
+    return;
+  }
+
+  // 打分逻辑：市委书记权重最高 + 反复提法加权 + 政策启示加分 + 高优先场合加分
+  const HIGH_OCC = /全会|常委会扩大|常委会|动员|推进会|部署|启动|开幕/;
+  const MID_OCC = /调研|座谈|现场办公|审计/;
+  const scored = recent.map((s) => {
+    let score = 0;
+    if (s.leader === "陈吉宁" || s.role === "市委书记") score += 8;
+    else if (s.leader === "龚正" || s.role === "市长") score += 5;
+    const occ = (s.occasion || "") + (s.title || "") + (s.headline || "");
+    if (HIGH_OCC.test(occ)) score += 5;
+    else if (MID_OCC.test(occ)) score += 3;
+    else score += 1; // 会见外事兜底
+    const np = s.new_phrasing || [];
+    score += np.length * 2;
+    // 反复 ≥2 次的提法每条额外 +5（说明已成市委话语体系）
+    let repeatBoost = 0;
+    np.forEach((p) => {
+      const c = state.phraseCounts[(p||"").trim()] || 0;
+      if (c >= 2) repeatBoost += 5;
+    });
+    score += repeatBoost;
+    if (s.policy_implications && s.policy_implications.length > 20) score += 3;
+    return { ...s, _score: score, _repeatBoost: repeatBoost };
+  });
+
+  // 同主题最多保留 2 条（避免 Top 3 全是同主题）
+  const top3 = [];
+  const themeCount = {};
+  scored.sort((a, b) => b._score - a._score);
+  for (const x of scored) {
+    const t = x.theme || "未分类";
+    if ((themeCount[t] || 0) >= 2) continue;
+    themeCount[t] = (themeCount[t] || 0) + 1;
+    top3.push(x);
+    if (top3.length === 3) break;
+  }
+
+  top3.forEach((sig, idx) => {
     const card = document.createElement("article");
     card.className = "focus-card";
     card.tabIndex = 0;
+    const roleShort = (sig.role === "市委书记" || sig.leader === "陈吉宁") ? "书记" : "市长";
+    const dateShort = (sig.date || "").slice(5).replace("-", "/");
+    const np = sig.new_phrasing || [];
+    // 找出 反复 ≥2 次的提法（"已立住的"）
+    const repeatedPhrases = np.filter((p) => (state.phraseCounts[(p||"").trim()] || 0) >= 2);
+    const newPhrases = np.filter((p) => (state.phraseCounts[(p||"").trim()] || 0) < 2).slice(0, 2);
+
+    const phraseSection = (repeatedPhrases.length || newPhrases.length) ? `
+      <ul class="focus-phrases">
+        ${repeatedPhrases.slice(0,2).map((p) => `
+          <li class="phrase-repeat">
+            <span class="phrase-tag">已立住 ${state.phraseCounts[p.trim()]}×</span>
+            <span class="phrase-text">${p}</span>
+          </li>
+        `).join("")}
+        ${newPhrases.map((p) => `
+          <li class="phrase-new">
+            <span class="phrase-tag">新提法</span>
+            <span class="phrase-text">${p}</span>
+          </li>
+        `).join("")}
+      </ul>
+    ` : "";
+
     card.innerHTML = `
       <span class="rank">${String(idx + 1).padStart(2, "0")}</span>
-      <span class="theme">${topic.theme}</span>
-      <h3>${topic.cut}</h3>
-      <p class="focus-thesis">${topic.thesis}</p>
-      <div class="focus-meta">
-        <span>${topic._matched} 条信号匹配</span>
-        <span class="score-chip">热度 ${topic._score}</span>
+      <span class="theme">${sig.theme || ""}</span>
+      <div class="focus-meta-top">
+        <span class="focus-date">${dateShort}</span>
+        <span class="focus-role">${roleShort}</span>
+        <span class="focus-occasion">${sig.occasion || ""}</span>
+      </div>
+      <h3>${sig.headline || sig.title || "—"}</h3>
+      ${phraseSection}
+      ${sig.policy_implications ? `
+        <div class="focus-implications">
+          <span class="impl-label">民盟切入</span>
+          <p>${sig.policy_implications}</p>
+        </div>
+      ` : ""}
+      <div class="focus-meta-bot">
+        <span class="score-chip">关注度 ${sig._score}</span>
+        ${sig.url ? `<a href="${sig.url}" target="_blank" rel="noreferrer" class="focus-link">查看来源 →</a>` : ""}
       </div>
     `;
-    card.addEventListener("click", () => selectTopic(topic.id));
+    // 点击/回车：滚到时间轴近一周区
+    const scrollToTimeline = () => {
+      document.getElementById("leaders")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+    card.addEventListener("click", scrollToTimeline);
     card.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        selectTopic(topic.id);
-      }
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); scrollToTimeline(); }
     });
     els.focusGrid.append(card);
   });
