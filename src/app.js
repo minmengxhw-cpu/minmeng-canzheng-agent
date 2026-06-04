@@ -303,29 +303,48 @@ function renderPhraseCloud() {
   const items = filteredLeaders();
   if (!items.length) { target.innerHTML = ""; return; }
 
-  // 收集所有新提法 + 出处，按日期倒序展示
+  // 收集所有新提法 + 出处。判断"书记/市长"用 role 字段（leader 字段是人名）
+  // 用户原则：市委书记讲话变化最高优先，侧栏配额书记 ≥10 / 市长 ≤5
   const phrases = [];
   items.forEach((s) => {
+    const isSecretary = (s.role === "市委书记" || s.leader === "陈吉宁");
     (s.new_phrasing || []).forEach((p) => {
-      phrases.push({ text: p, date: s.date, leader: s.leader, theme: s.theme });
+      phrases.push({
+        text: p, date: s.date,
+        leader: s.leader, role: s.role,
+        isSecretary,
+        theme: s.theme,
+      });
     });
   });
 
   if (!phrases.length) { target.innerHTML = ""; return; }
 
-  // 按日期倒序，取近 15 条
+  // 按日期倒序
   phrases.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-  const top = phrases.slice(0, 15);
 
-  // 编号 + 日期 + 提法的紧凑列表（侧栏窄空间适配，CC 文档式审美）
+  // 配额：书记池 + 市长池，分别按日期倒序，最后合并按日期再排
+  const SEC_QUOTA = 10;   // 书记最多 10 条
+  const MAYOR_QUOTA = 5;  // 市长最多 5 条
+  const secretaryPool = phrases.filter((p) => p.isSecretary).slice(0, SEC_QUOTA);
+  const mayorPool = phrases.filter((p) => !p.isSecretary).slice(0, MAYOR_QUOTA);
+  const top = [...secretaryPool, ...mayorPool]
+    .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+
+  const secN = secretaryPool.length;
+  const mayN = mayorPool.length;
+
+  // 编号 + 日期 + 提法的紧凑列表
   const listHtml = top.map((p, i) => {
     const dateShort = (p.date || "").slice(5).replace("-", "/");
+    const roleLabel = p.isSecretary ? "书记" : "市长";
+    const roleClass = p.isSecretary ? "is-secretary" : "is-mayor";
     return `
-      <li class="np-side-item" title="${p.date} · ${p.leader} · ${p.theme || ""}">
+      <li class="np-side-item ${roleClass}" title="${p.date} · ${p.leader} · ${p.theme || ""}">
         <span class="np-side-num">${String(i + 1).padStart(2, "0")}</span>
         <div class="np-side-body">
           <div class="np-side-text">${p.text}</div>
-          <div class="np-side-meta">${dateShort} · ${p.leader === "市委书记" ? "书记" : "市长"}</div>
+          <div class="np-side-meta">${dateShort} · ${roleLabel}</div>
         </div>
       </li>
     `;
@@ -335,7 +354,7 @@ function renderPhraseCloud() {
     <aside class="phrase-side">
       <div class="phrase-side-head">
         <span class="phrase-side-eyebrow">近期新提法</span>
-        <span class="phrase-side-sub">按日期倒序 · 取近 ${top.length} 条 / 共 ${phrases.length} 条</span>
+        <span class="phrase-side-sub">书记 ${secN} 条 · 市长 ${mayN} 条 / 共 ${phrases.length} 条</span>
       </div>
       <ol class="phrase-side-list">${listHtml}</ol>
     </aside>

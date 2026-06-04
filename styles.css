@@ -2406,8 +2406,18 @@ p { margin: 0; }
   display: grid;
   grid-template-columns: 26px 1fr;
   gap: 10px;
-  padding: 10px 0;
+  padding: 10px 4px 10px 10px;
   border-bottom: 1px dashed var(--line);
+  border-left: 3px solid transparent;
+  margin-left: -4px;
+  transition: background 0.15s ease;
+}
+.np-side-item.is-secretary {
+  border-left-color: var(--accent);
+  background: linear-gradient(90deg, rgba(245,232,226,0.35) 0%, rgba(255,255,255,0) 60%);
+}
+.np-side-item.is-mayor {
+  border-left-color: #BDBDBD;
 }
 .np-side-item:last-child { border-bottom: 0; }
 .np-side-num {
