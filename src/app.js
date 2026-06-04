@@ -762,6 +762,51 @@ function renderFocus() {
    渲染：切口孵化库
    ------------------------------------------------------------ */
 
+function buildCutCardEl(topic, isAuto) {
+  const card = document.createElement("article");
+  card.className = "cut-card";
+  const mechChips = (topic.mechanism || [])
+    .map((m) => `<span class="mech-chip">${m}</span>`)
+    .join("");
+
+  let footHtml;
+  if (isAuto) {
+    const sources = topic.signal_links?.length || 0;
+    const firstShort = (topic.first_date || "").slice(5).replace("-", "/");
+    footHtml = `
+      <span class="cut-score">
+        <span class="count-pill">反复 ${topic.count || 1}×</span>
+        <span class="first-date">首发 ${firstShort}</span>
+        <span class="src-count">${sources} 条来源</span>
+      </span>
+      <button type="button" class="open-btn">进入工作台</button>
+    `;
+  } else {
+    footHtml = `
+      <span class="cut-score">热度 <strong>${topic._score || ""}</strong> · ${topic._matched || 0} 信号</span>
+      <button type="button" class="open-btn">进入工作台</button>
+    `;
+  }
+  const kwChips = isAuto && (topic.keywords || []).length
+    ? `<div class="cut-keywords">${topic.keywords.slice(0, 5).map((k) => `<span class="kw-chip">${k}</span>`).join("")}</div>`
+    : "";
+
+  card.innerHTML = `
+    <div class="cut-head">
+      <div>
+        <div class="cut-theme">${topic.theme}</div>
+        <h3>${topic.cut}</h3>
+      </div>
+    </div>
+    <p class="cut-thesis">${topic.thesis}</p>
+    <div class="mechanism">${mechChips}</div>
+    ${kwChips}
+    <div class="cut-foot">${footHtml}</div>
+  `;
+  card.querySelector(".open-btn").addEventListener("click", () => selectTopic(topic.id));
+  return card;
+}
+
 function renderCuts() {
   if (!els.cutGrid) return;
   const query = state.search.toLowerCase().trim();
@@ -778,55 +823,70 @@ function renderCuts() {
   }
 
   const isAuto = state.cuts.length > 0;
+  const filterActive = state.selectedTheme !== "all" || !!query;
 
-  topics.forEach((topic) => {
-    const card = document.createElement("article");
-    card.className = "cut-card";
-    const mechChips = (topic.mechanism || [])
-      .map((m) => `<span class="mech-chip">${m}</span>`)
-      .join("");
+  // 筛选/搜索激活 或 总量很少 → 直接平铺
+  if (filterActive || topics.length <= 8) {
+    topics.forEach((t) => els.cutGrid.append(buildCutCardEl(t, isAuto)));
+    return;
+  }
 
-    // 自动切口模式：展示反复次数 + 首发日期 + 关键词
-    // 静态 demo 模式：用旧的 _score/_matched
-    let footHtml;
-    if (isAuto) {
-      const sources = topic.signal_links?.length || 0;
-      const firstShort = (topic.first_date || "").slice(5).replace("-", "/");
-      footHtml = `
-        <span class="cut-score">
-          <span class="count-pill">反复 ${topic.count || 1}×</span>
-          <span class="first-date">首发 ${firstShort}</span>
-          <span class="src-count">${sources} 条来源</span>
-        </span>
-        <button type="button" class="open-btn">进入工作台</button>
-      `;
-    } else {
-      footHtml = `
-        <span class="cut-score">热度 <strong>${topic._score || ""}</strong> · ${topic._matched || 0} 信号</span>
-        <button type="button" class="open-btn">进入工作台</button>
-      `;
-    }
+  // 默认模式：Top 6 高频反复 + 其余按主题折叠
+  const TOP_N = 6;
+  const featured = topics.slice(0, TOP_N);
+  const rest = topics.slice(TOP_N);
 
-    // 关键词 chip（仅自动模式展示，避免和机制 chip 混淆）
-    const kwChips = isAuto && (topic.keywords || []).length
-      ? `<div class="cut-keywords">${topic.keywords.slice(0, 5).map((k) => `<span class="kw-chip">${k}</span>`).join("")}</div>`
-      : "";
+  // 1) 高频精选区
+  const featSection = document.createElement("section");
+  featSection.className = "cut-section cut-section-featured";
+  featSection.innerHTML = `
+    <h3 class="cut-section-head">
+      <span class="section-icon">★</span>
+      <span class="section-title">高频反复 · Top ${featured.length}</span>
+      <span class="section-sub">市委话语体系中累计反复最多的核心切口</span>
+    </h3>
+    <div class="cut-section-grid"></div>
+  `;
+  const featGrid = featSection.querySelector(".cut-section-grid");
+  featured.forEach((t) => featGrid.append(buildCutCardEl(t, isAuto)));
+  els.cutGrid.append(featSection);
 
-    card.innerHTML = `
-      <div class="cut-head">
-        <div>
-          <div class="cut-theme">${topic.theme}</div>
-          <h3>${topic.cut}</h3>
-        </div>
-      </div>
-      <p class="cut-thesis">${topic.thesis}</p>
-      <div class="mechanism">${mechChips}</div>
-      ${kwChips}
-      <div class="cut-foot">${footHtml}</div>
-    `;
-    card.querySelector(".open-btn").addEventListener("click", () => selectTopic(topic.id));
-    els.cutGrid.append(card);
+  // 2) 其余按主题分组折叠
+  const byTheme = {};
+  rest.forEach((t) => {
+    const k = t.theme || "未分类";
+    (byTheme[k] = byTheme[k] || []).push(t);
   });
+  // 按组内最高 count 倒序
+  const themeOrder = Object.keys(byTheme).sort((a, b) => {
+    const ma = Math.max(...byTheme[a].map((x) => x.count || 0));
+    const mb = Math.max(...byTheme[b].map((x) => x.count || 0));
+    return mb - ma;
+  });
+
+  if (rest.length) {
+    const restWrap = document.createElement("div");
+    restWrap.className = "cut-rest-wrap";
+    restWrap.innerHTML = `<div class="cut-rest-head">按主题查看其他切口（共 ${rest.length} 条 · 默认收起）</div>`;
+    themeOrder.forEach((theme) => {
+      const list = byTheme[theme];
+      const det = document.createElement("details");
+      det.className = "cut-theme-fold";
+      det.innerHTML = `
+        <summary class="cut-theme-summary">
+          <span class="theme-chev">▸</span>
+          <span class="theme-name">${theme}</span>
+          <span class="theme-count">${list.length} 条切口</span>
+          <span class="theme-top">Top 反复 ${Math.max(...list.map((x) => x.count || 0))}×</span>
+        </summary>
+        <div class="cut-section-grid"></div>
+      `;
+      const grid = det.querySelector(".cut-section-grid");
+      list.forEach((t) => grid.append(buildCutCardEl(t, isAuto)));
+      restWrap.append(det);
+    });
+    els.cutGrid.append(restWrap);
+  }
 }
 
 /* ------------------------------------------------------------
