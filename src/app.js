@@ -28,6 +28,7 @@ const state = {
   leaderSearch: "",
   leaderItems: [],       // 所有 leaders 信号缓存
   phraseCounts: {},      // phrase -> 累计反复次数（来自 chronology）
+  cuts: [],              // 自动生成的切口（来自 cuts.json），优先于 DATA.topics
 };
 
 /* ------------------------------------------------------------
@@ -108,10 +109,19 @@ function rankedTopics() {
     .sort((a, b) => b._score - a._score);
 }
 
+function activeTopicPool() {
+  // 优先用自动生成的真实切口，回退到 DATA.topics（demo 兜底）
+  return state.cuts.length ? state.cuts : DATA.topics;
+}
+
 function filteredTopics() {
-  return rankedTopics().filter((t) =>
-    state.selectedTheme === "all" || t.theme === state.selectedTheme
-  );
+  const pool = activeTopicPool();
+  // 当使用 cuts.json 时按 count 排（反复次数），用 DATA.topics 时按打分
+  const sorted = state.cuts.length
+    ? [...pool].sort((a, b) => (b.count || 0) - (a.count || 0) || (b.first_date || "").localeCompare(a.first_date || ""))
+    : pool.map((t) => ({ ...t, _score: getTopicScore(t), _matched: getMatchedSignals(t).length }))
+         .sort((a, b) => b._score - a._score);
+  return sorted.filter((t) => state.selectedTheme === "all" || t.theme === state.selectedTheme);
 }
 
 function filteredSignals() {
@@ -154,16 +164,32 @@ async function loadPhraseCounts() {
   } catch (e) { return {}; }
 }
 
+async function loadCuts() {
+  try {
+    const r = await fetch("./data/cuts.json", { cache: "no-store" });
+    if (!r.ok) return [];
+    const arr = await r.json();
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+}
+
 async function renderLeaders() {
-  // 加载并缓存所有信号 + 累计次数
-  const [all0, counts] = await Promise.all([loadLeaderSignals(), loadPhraseCounts()]);
+  // 加载并缓存所有信号 + 累计次数 + 切口
+  const [all0, counts, cuts] = await Promise.all([loadLeaderSignals(), loadPhraseCounts(), loadCuts()]);
   const all = all0
     .filter((s) => s.date)
     .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   state.leaderItems = all;
   state.phraseCounts = counts;
+  state.cuts = cuts;
+  // 切到自动切口后第一条作为工作台默认选中
+  if (cuts.length) state.selectedTopicId = cuts[0].id;
   // 数据就绪后重渲染依赖此数据的模块
   renderFocus();
+  renderCuts();
+  renderWorkbench();
+  renderThemeFilter();
+  renderMeta();
 
   if (els.leadersEyebrow && all.length) {
     els.leadersEyebrow.textContent = `市委关注 · 共 ${all.length} 条 · 最近更新 ${all[0].date}`;
@@ -631,10 +657,11 @@ function renderFocus() {
    ------------------------------------------------------------ */
 
 function renderCuts() {
+  if (!els.cutGrid) return;
   const query = state.search.toLowerCase().trim();
   const topics = filteredTopics().filter((t) => {
     if (!query) return true;
-    return [t.title, t.cut, t.theme, t.thesis, ...t.keywords]
+    return [t.title, t.cut, t.theme, t.thesis, ...(t.keywords || [])]
       .join(" ").toLowerCase().includes(query);
   });
 
@@ -644,12 +671,41 @@ function renderCuts() {
     return;
   }
 
+  const isAuto = state.cuts.length > 0;
+
   topics.forEach((topic) => {
     const card = document.createElement("article");
     card.className = "cut-card";
-    const mechChips = topic.mechanism
+    const mechChips = (topic.mechanism || [])
       .map((m) => `<span class="mech-chip">${m}</span>`)
       .join("");
+
+    // 自动切口模式：展示反复次数 + 首发日期 + 关键词
+    // 静态 demo 模式：用旧的 _score/_matched
+    let footHtml;
+    if (isAuto) {
+      const sources = topic.signal_links?.length || 0;
+      const firstShort = (topic.first_date || "").slice(5).replace("-", "/");
+      footHtml = `
+        <span class="cut-score">
+          <span class="count-pill">反复 ${topic.count || 1}×</span>
+          <span class="first-date">首发 ${firstShort}</span>
+          <span class="src-count">${sources} 条来源</span>
+        </span>
+        <button type="button" class="open-btn">进入工作台</button>
+      `;
+    } else {
+      footHtml = `
+        <span class="cut-score">热度 <strong>${topic._score || ""}</strong> · ${topic._matched || 0} 信号</span>
+        <button type="button" class="open-btn">进入工作台</button>
+      `;
+    }
+
+    // 关键词 chip（仅自动模式展示，避免和机制 chip 混淆）
+    const kwChips = isAuto && (topic.keywords || []).length
+      ? `<div class="cut-keywords">${topic.keywords.slice(0, 5).map((k) => `<span class="kw-chip">${k}</span>`).join("")}</div>`
+      : "";
+
     card.innerHTML = `
       <div class="cut-head">
         <div>
@@ -659,10 +715,8 @@ function renderCuts() {
       </div>
       <p class="cut-thesis">${topic.thesis}</p>
       <div class="mechanism">${mechChips}</div>
-      <div class="cut-foot">
-        <span class="cut-score">热度 <strong>${topic._score}</strong> · ${topic._matched} 信号</span>
-        <button type="button" class="open-btn">进入工作台</button>
-      </div>
+      ${kwChips}
+      <div class="cut-foot">${footHtml}</div>
     `;
     card.querySelector(".open-btn").addEventListener("click", () => selectTopic(topic.id));
     els.cutGrid.append(card);
@@ -709,7 +763,8 @@ function renderSignals() {
    ------------------------------------------------------------ */
 
 function renderWorkbench() {
-  const topic = DATA.topics.find((t) => t.id === state.selectedTopicId);
+  const pool = activeTopicPool();
+  const topic = pool.find((t) => t.id === state.selectedTopicId) || pool[0];
   if (!topic) return;
   els.workbenchTitle.textContent = `成果转化 · ${topic.theme}`;
 
@@ -767,8 +822,12 @@ function renderSources() {
    ------------------------------------------------------------ */
 
 function renderMeta() {
-  els.metaSignals.textContent = `${DATA.signals.length} 条公开信号`;
-  els.metaTopics.textContent = `${DATA.topics.length} 个候选切口`;
+  const cutCount = state.cuts.length || DATA.topics.length;
+  const leaderCount = state.leaderItems.length;
+  els.metaSignals.textContent = leaderCount
+    ? `${leaderCount} 条领导动态`
+    : `${DATA.signals.length} 条公开信号`;
+  els.metaTopics.textContent = `${cutCount} 个候选切口${state.cuts.length ? "（自动生成）" : ""}`;
   els.metaSources.textContent = `${DATA.sources.length} 个权威信源`;
 }
 
@@ -777,7 +836,11 @@ function renderMeta() {
    ------------------------------------------------------------ */
 
 function renderThemeFilter() {
-  const themes = [...new Set(DATA.topics.map((t) => t.theme))];
+  if (!els.themeFilter) return;
+  // 重渲染时清空（保留 "全部专题"）
+  while (els.themeFilter.options.length > 1) els.themeFilter.remove(1);
+  const pool = activeTopicPool();
+  const themes = [...new Set(pool.map((t) => t.theme))];
   themes.forEach((theme) => {
     const opt = document.createElement("option");
     opt.value = theme;
