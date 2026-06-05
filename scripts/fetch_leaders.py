@@ -1,23 +1,29 @@
 #!/usr/bin/env python3
-"""市委主要领导讲话/活动抓取 + 入库分析（全任期回溯版）
+"""市委主要领导讲话/活动抓取 + 入库分析（数据源：上海发布）
+
+2026-06 数据源切换：上海市政府门户网 nw4411 更新太慢，改抓腾讯新闻「上观新闻」
+（上报集团党媒号，日更多条，书记/市长调研会见时政覆盖快）。
+注：「上海发布」腾讯号实测为民生资讯号，300 条 0 领导，故弃用；改用上观新闻。
 
 数据流：
-  1. 列表页 nw4411（市政府要闻，服务端渲染、稳定翻页）
-     翻页：index.html, index_2.html, index_3.html ...（无 index_1）
-     动态停止：翻到 --since 截止日期 / 达到 --max-pages / 连续 404
+  1. 列表接口 getSubNewsMixedList（JSON，offsetInfo 游标翻页，无需渲染）
+     guestSuid=8QMd3H1b7oIVvz7b 即「上观新闻」账号
+     动态停止：翻到 --since 截止日期 / hasNext=0 / 达到 --max-pages
   2. 候选过滤（两阶段）：
-     - 标题直接署领导名（陈吉宁/龚正…）→ 必抓
-     - 标题未署名但命中"领导活动动词"（主持/出席/调研/会见/座谈/
-       推进会/动员/部署/考察/督查/检查/慰问/讲话/会议/强调）→ 抓详情二次判定
-     - 其余（民生资讯/政策解读/区县动态）→ 跳过，避免无谓抓 1.7 万详情页
-  3. 详情页全文（.Article_content 等）→ detail_has_leader 二次确认含书记/市长
+     - 标题/AI摘要直接署领导名（陈吉宁/龚正…）→ 必抓
+     - 标题命中"领导活动动词"（主持/出席/调研/会见/座谈/推进会/动员/
+       部署/考察/督查/检查/慰问/讲话/会议/强调）→ 抓详情二次判定
+     - 其余（民生资讯/活动预告/天气）→ 跳过
+  3. 详情页 news.qq.com/rain/a/<id> → 解析 originContent.text 全文
+     → detail_has_leader 二次确认含书记/市长
   4. 辅助理解 → 摘要 + 关键论断 + 新提法 + 政策启示
   5. 与历史同主题对比 → 识别重点变化（持续提及 vs 新出现）
   6. 断点续抓：复用 data/leaders.json 已分析条目（按 url），增量写盘 + 进度日志
+     旧的政府网历史条目原样保留，新增条目来自上海发布。
 
 运行：
   python3 scripts/fetch_leaders.py                  # 默认回溯最近 180 天
-  SINCE=2022-10-01 MAX_PAGES=900 python3 scripts/fetch_leaders.py   # 全任期
+  SINCE=2026-01-01 MAX_PAGES=120 python3 scripts/fetch_leaders.py   # 指定回溯
   ONLY_SECRETARY=1 python3 scripts/fetch_leaders.py # 只抓市委书记
   DEEPSEEK_API_KEY=sk-xxx ...
 """
@@ -57,8 +63,15 @@ if ONLY_SECRETARY:
 # 回溯参数
 SINCE = os.environ.get("SINCE", "")  # YYYY-MM-DD；空则取 今天-DEFAULT_DAYS
 DEFAULT_DAYS = int(os.environ.get("DEFAULT_DAYS", "180"))
-MAX_PAGES = int(os.environ.get("MAX_PAGES", "60"))
-LIST_BASE = "https://www.shanghai.gov.cn/nw4411/"
+MAX_PAGES = int(os.environ.get("MAX_PAGES", "60"))  # 一页=一次接口翻页(约20条)
+
+# 上观新闻（上报集团党媒号，时政覆盖强、日更多条，含书记/市长调研会见）
+# 实测优于政府网与「上海发布」民生号：后者 300 条 0 领导，上观 160 条命中 4 条署名
+# media_id=5004941，guestSuid 为列表接口所需的账号令牌
+GUEST_SUID = os.environ.get("SH_GUEST_SUID", "8QMd3H1b7oIVvz7b")
+LIST_API = "https://i.news.qq.com/getSubNewsMixedList"
+DETAIL_RAIN = "https://news.qq.com/rain/a/"   # + <articleId>
+SOURCE_NAME = "上观新闻"
 
 # 领导活动动词门控：标题未署名时，只有命中这些词才下钻详情页
 ACTIVITY_VERBS = [
@@ -140,33 +153,48 @@ def fetch(url: str, timeout: int = 25) -> Optional[str]:
             time.sleep(2 + attempt * 2)
 
 
-def list_url(page: int) -> str:
-    return f"{LIST_BASE}index.html" if page == 1 else f"{LIST_BASE}index_{page}.html"
+def fetch_list_page(offset_info: str) -> Optional[Dict]:
+    """拉一页上海发布列表（JSON）。offset_info 为上一页返回的游标，首页传空。"""
+    params = {
+        "offset_info": offset_info or "",
+        "guestSuid": GUEST_SUID,
+        "tabId": "om_index",
+        "caller": "1",
+        "from_scene": "103",
+    }
+    for attempt in range(3):
+        try:
+            r = requests.get(LIST_API, params=params,
+                             headers={**HEADERS, "Referer": "https://news.qq.com/"},
+                             timeout=25)
+            r.raise_for_status()
+            return r.json()
+        except Exception as e:
+            if attempt == 2:
+                log(f"    ✗ 列表接口失败: {e}")
+                return None
+            time.sleep(2 + attempt * 2)
 
 
-def parse_list(html: str, base_url: str) -> List[Dict]:
-    """解析列表页所有要闻条目（标题 + URL + 日期，日期取 URL 内嵌段）"""
-    soup = BeautifulSoup(html, "html.parser")
+def parse_list(data: Dict) -> List[Dict]:
+    """从列表接口 JSON 提取条目：标题 + 摘要 + URL + 日期"""
     out: List[Dict] = []
-    seen = set()
-    for a in soup.find_all("a", href=True):
-        href = a["href"]
-        if href.startswith("/"):
-            href = urllib.parse.urljoin(base_url, href)
-        elif not href.startswith("http"):
+    for n in data.get("newslist", []):
+        if n.get("articletype") not in ("0", 0, "", None):  # 0=图文；过滤纯视频/直播/广告
+            pass  # 不强制，部分时政为视频，仍保留
+        aid = n.get("id") or ""
+        t = (n.get("time") or "")[:10]  # "2026-06-05 07:38:02" → 2026-06-05
+        if not aid or not t:
             continue
-        m_url = re.search(r"/nw\d+/(20\d{2})(\d{2})(\d{2})/", href)
-        if not m_url:
+        title = (n.get("longtitle") or n.get("title") or "").strip()
+        if len(title) < 5:
             continue
-        if href in seen:
-            continue
-        seen.add(href)
-        title = (a.get_text(strip=True) or "").strip()
-        title = re.sub(r"\s*20\d{2}[-./]\d{1,2}[-./]\d{1,2}\s*$", "", title).strip()
-        if len(title) < 6:
-            continue
-        date_str = f"{m_url.group(1)}-{m_url.group(2)}-{m_url.group(3)}"
-        out.append({"date": date_str, "headline": title[:160], "url": href})
+        abstract = (n.get("nlpAbstract") or "") + " " + (n.get("nlpContentAbstract") or "")
+        out.append({
+            "date": t, "headline": title[:160], "id": aid,
+            "url": n.get("url") or (DETAIL_RAIN + aid),
+            "abstract": abstract.strip(),
+        })
     return out
 
 
@@ -190,16 +218,29 @@ def detail_has_leader(full_text: str) -> Optional[Dict]:
     return None
 
 
-def fetch_detail(url: str) -> str:
-    html = fetch(url, timeout=30)
-    if not html:
+def fetch_detail(article_id: str) -> str:
+    """抓 news.qq.com/rain/a/<id> SSR 页，解析 originContent.text 全文"""
+    import html as _html
+    page = fetch(DETAIL_RAIN + article_id, timeout=30)
+    if not page:
         return ""
-    soup = BeautifulSoup(html, "html.parser")
-    for cls in ["Article_content", "article-content", "TRS_Editor", "zoomCon", "ity_con"]:
-        el = soup.find(class_=cls) or soup.find(id=cls)
-        if el:
-            text = el.get_text(" ", strip=True)
-            return re.sub(r"\s+", " ", text)
+    i = page.find('"originContent":')
+    if i >= 0:
+        start = page.find("{", i)
+        try:
+            obj, _ = json.JSONDecoder().raw_decode(page, start)
+            raw = obj.get("text", "") or ""
+            txt = re.sub(r"<[^>]+>", " ", raw)
+            txt = re.sub(r"\s+", " ", _html.unescape(txt)).strip()
+            if len(txt) > 40:
+                return txt
+        except Exception:
+            pass
+    # 兜底：BeautifulSoup 取 rich_media_content
+    soup = BeautifulSoup(page, "html.parser")
+    el = soup.find(class_="rich_media_content") or soup.find(class_="content-article")
+    if el:
+        return re.sub(r"\s+", " ", el.get_text(" ", strip=True))
     return ""
 
 
@@ -278,7 +319,7 @@ def save(results: List[Dict]):
 def main() -> int:
     since = SINCE or (datetime.now() - timedelta(days=DEFAULT_DAYS)).strftime("%Y-%m-%d")
     log(f"\n=== 抓取市委领导讲话/活动 + 入库分析 ===")
-    log(f"  节点 nw4411 · 回溯至 {since} · 最多 {MAX_PAGES} 页 · "
+    log(f"  源：上海发布 · 回溯至 {since} · 最多 {MAX_PAGES} 翻页 · "
         f"领导 {list(LEADERS)} · ONLY_SECRETARY={ONLY_SECRETARY}")
 
     # 读历史（断点续抓）
@@ -292,36 +333,34 @@ def main() -> int:
     results: List[Dict] = list(history)  # 以历史为基底，增量补充
     results_urls = set(history_urls)
 
-    # 1. 翻页收集候选
+    # 1. 翻页收集候选（offsetInfo 游标翻页）
     candidates: List[Dict] = []
     seen = set()
-    stop = False
+    offset = ""
     for page in range(1, MAX_PAGES + 1):
-        if stop:
+        data = fetch_list_page(offset)
+        if not data or data.get("ret") not in (0, "0"):
+            log(f"  · 第 {page} 翻页接口异常，停止")
             break
-        url = list_url(page)
-        html = fetch(url)
-        if not html:
-            log(f"  · 第 {page} 页 404/失败，停止翻页")
-            break
-        items = parse_list(html, url)
+        items = parse_list(data)
         if not items:
-            log(f"  · 第 {page} 页无条目，停止翻页")
+            log(f"  · 第 {page} 翻页无条目，停止")
             break
         page_min = min(it["date"] for it in items)
         new_n = 0
         for it in items:
-            if it["url"] in seen:
+            if it["id"] in seen:
                 continue
-            seen.add(it["url"])
+            seen.add(it["id"])
             if it["date"] < since:
                 continue  # 早于截止日期，丢弃（但继续看本页其余）
             candidates.append(it)
             new_n += 1
-        log(f"  · 第 {page} 页 {len(items)} 条（最早 {page_min}）→ 收 {new_n} 条候选")
-        if page_min < since:
-            log(f"  · 本页已越过截止日期 {since}，停止翻页")
-            stop = True
+        log(f"  · 第 {page} 翻页 {len(items)} 条（最早 {page_min}）→ 收 {new_n} 条候选")
+        offset = urllib.parse.unquote_plus(data.get("offsetInfo", "") or "")
+        if not data.get("hasNext") or page_min < since or not offset:
+            log(f"  · 到底 / 越过截止日期 {since}，停止翻页")
+            break
 
     log(f"\n共收集 {len(candidates)} 条候选（≥{since}）→ 两阶段过滤 + 入库分析")
 
@@ -332,12 +371,13 @@ def main() -> int:
             skip_existed += 1
             continue
 
-        named = title_named_leader(c["headline"])
-        if not named and not title_is_activity(c["headline"]):
+        abstract = c.get("abstract", "")
+        named = title_named_leader(c["headline"]) or title_named_leader(abstract)
+        if not named and not title_is_activity(c["headline"]) and not title_is_activity(abstract):
             skip_norel += 1
-            continue  # 标题既未署名也非领导活动 → 不下钻
+            continue  # 标题/摘要既未署名也非领导活动 → 不下钻
 
-        full = fetch_detail(c["url"])
+        full = fetch_detail(c["id"])
         if not full:
             continue
         leader = detail_has_leader(full)
@@ -349,7 +389,7 @@ def main() -> int:
         if not analysis:
             continue
         entry = {
-            "id": f"ld-gov-{abs(hash(c['url'])) % 100000:05d}",
+            "id": f"ld-sh-{c['id']}",
             "date": c["date"], "leader": leader["leader"], "role": leader["role"],
             "role_rank": leader["rank"], "occasion": analysis.get("occasion", ""),
             "headline": c["headline"], "full_text": full[:3000],
@@ -360,7 +400,7 @@ def main() -> int:
             "subthemes": analysis.get("subthemes", []),
             "keywords": analysis.get("keywords", []),
             "policy_implications": analysis.get("policy_implications", ""),
-            "source": "上海市人民政府门户网站", "url": c["url"],
+            "source": SOURCE_NAME, "url": c["url"],
         }
         entry.update(detect_change(entry, results))
         results.append(entry)
