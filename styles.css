@@ -2782,3 +2782,34 @@ p { margin: 0; }
 .evo-cmp { font-size: 12px; color: var(--muted, #7a766c); }
 .evo-src { font-size: 12.5px; color: var(--accent, #9c2b21); text-decoration: none; font-weight: 600; }
 .evo-src:hover { text-decoration: underline; }
+
+/* —— 提法流变增强：近30天高亮区 + 只看有新增开关 —— */
+.evolve-recent { margin-bottom: 16px; }
+.evo-rhead {
+  font-size: 13px; font-weight: 700; color: var(--accent, #9c2b21); margin-bottom: 10px; letter-spacing: .3px;
+}
+.evo-rlist { display: flex; flex-wrap: wrap; gap: 9px; }
+.evo-rchip {
+  display: inline-flex; align-items: center; gap: 7px; max-width: 100%;
+  background: #fdf8f4; border: 1px solid rgba(156,43,33,.28); border-radius: 999px;
+  padding: 6px 13px; text-decoration: none; transition: background .15s;
+}
+.evo-rchip:hover { background: #f8ece5; }
+.erc-date { font-size: 11px; color: var(--accent, #9c2b21); font-weight: 700; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.erc-theme { font-size: 10.5px; color: #fff; background: var(--accent, #9c2b21); border-radius: 8px; padding: 1px 7px; flex-shrink: 0; }
+.erc-text { font-size: 12.5px; color: var(--ink2, #463f34); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px; }
+
+.evolve-controls { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+.evolve-controls .evolve-themes { flex: 1; margin-bottom: 0; }
+.evo-toggle {
+  flex-shrink: 0; font-size: 12.5px; color: var(--ink2, #463f34); cursor: pointer;
+  background: var(--card, #fbfaf6); border: 1px solid var(--line, #e6e3da); border-radius: 999px; padding: 7px 16px;
+  transition: .15s;
+}
+.evo-toggle::before { content: "○ "; color: var(--muted, #8a8a82); }
+.evo-toggle.active { background: var(--accent, #9c2b21); color: #fff; border-color: var(--accent, #9c2b21); }
+.evo-toggle.active::before { content: "● "; color: #fff; }
+@media (max-width: 640px) {
+  .erc-text { max-width: 180px; }
+  .evolve-controls { flex-direction: column; }
+}
