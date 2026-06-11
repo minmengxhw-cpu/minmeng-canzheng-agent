@@ -26,6 +26,7 @@ const state = {
   leaderRole: "all",     // all | 陈吉宁 | 龚正
   leaderTheme: "all",
   evolveTheme: null,     // 提法流变当前选中主题
+  evolveOnlyNew: false,  // 只看有新增提法的节点
   leaderSearch: "",
   leaderItems: [],       // 所有 leaders 信号缓存
   phraseCounts: {},      // phrase -> 累计反复次数（来自 chronology）
@@ -57,6 +58,8 @@ const els = {
   evolveThemes: $("#evolveThemes"),
   evolveBody: $("#evolveBody"),
   evolveStat: $("#evolveStat"),
+  evolveRecent: $("#evolveRecent"),
+  evolveOnlyNew: $("#evolveOnlyNew"),
   outputTabs: $("#outputTabs"),
   workbenchTitle: $("#workbenchTitle"),
   activeCut: $("#activeCut"),
@@ -216,6 +219,7 @@ async function renderLeaders() {
   renderTrendChart();
   renderPhraseCloud();
   renderLeaderTimeline();
+  renderEvolveRecent();
   renderEvolution();
 }
 
@@ -230,6 +234,43 @@ function evoThemeCounts() {
   const cnt = {};
   state.leaderItems.forEach((s) => { if (s.theme) cnt[s.theme] = (cnt[s.theme] || 0) + 1; });
   return cnt;
+}
+
+function evoNP(s) {
+  return Array.isArray(s.new_phrasing) ? s.new_phrasing : (s.new_phrasing ? [s.new_phrasing] : []);
+}
+
+// 日期字符串 YYYY-MM-DD 减 n 天
+function dateMinus(ymd, n) {
+  const d = new Date(ymd + "T00:00:00");
+  if (Number.isNaN(d.getTime())) return ymd;
+  d.setDate(d.getDate() - n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/* 近 30 天新增提法高亮区（跨主题，基于数据最新日期为基准） */
+function renderEvolveRecent() {
+  if (!els.evolveRecent) return;
+  const dates = state.leaderItems.map((s) => s.date).filter(Boolean).sort();
+  if (!dates.length) { els.evolveRecent.innerHTML = ""; return; }
+  const cutoff = dateMinus(dates[dates.length - 1], 30);
+  const rows = [];
+  state.leaderItems.forEach((s) => {
+    if (!s.date || s.date < cutoff) return;
+    evoNP(s).forEach((p) => rows.push({ p, date: s.date, theme: s.theme || "", url: s.url || "" }));
+  });
+  rows.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  if (!rows.length) { els.evolveRecent.innerHTML = ""; return; }
+  const top = rows.slice(0, 12);
+  const chips = top.map((r) =>
+    `<a class="evo-rchip"${r.url ? ` href="${evoEsc(r.url)}" target="_blank" rel="noopener"` : ""}>
+       <span class="erc-date">${evoEsc((r.date || "").slice(5))}</span>
+       <span class="erc-theme">${evoEsc(r.theme)}</span>
+       <span class="erc-text">${evoEsc(r.p)}</span></a>`
+  ).join("");
+  els.evolveRecent.innerHTML =
+    `<div class="evo-rhead">🔥 近 30 天新增提法 · 共 ${rows.length} 条${rows.length > 12 ? "（展示最新 12 条）" : ""}</div>
+     <div class="evo-rlist">${chips}</div>`;
 }
 
 function renderEvolution() {
@@ -252,15 +293,16 @@ function renderEvolution() {
   }
 
   // 该主题信号，按日期正序（从早到晚）
-  const items = state.leaderItems
+  const allItems = state.leaderItems
     .filter((s) => s.theme === state.evolveTheme && s.date)
     .slice()
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const totalAdd = allItems.reduce((sum, s) => sum + evoNP(s).length, 0);
+  // 「只看有新增」开关：仅保留有新提法的节点
+  const items = state.evolveOnlyNew ? allItems.filter((s) => evoNP(s).length) : allItems;
 
-  let addCount = 0;
   const nodes = items.map((s, i) => {
-    const np = Array.isArray(s.new_phrasing) ? s.new_phrasing : (s.new_phrasing ? [s.new_phrasing] : []);
-    addCount += np.length;
+    const np = evoNP(s);
     const isLatest = i === items.length - 1;
     const occ = s.headline || s.occasion || "";
     const roleTag = s.role ? `<span class="evo-role">${evoEsc(s.role)}</span>` : "";
@@ -282,9 +324,11 @@ function renderEvolution() {
 
   els.evolveBody.innerHTML = items.length
     ? `<ol class="evo-timeline">${nodes}</ol>`
-    : '<p class="evo-empty">该主题暂无记录。</p>';
+    : '<p class="evo-empty">该主题在当前筛选下暂无记录。</p>';
   if (els.evolveStat) {
-    els.evolveStat.textContent = `「${state.evolveTheme}」· ${items.length} 次出现 · 累计新增提法 ${addCount} 条`;
+    els.evolveStat.textContent = state.evolveOnlyNew
+      ? `「${state.evolveTheme}」· ${items.length} 次有新增 · 累计新增提法 ${totalAdd} 条`
+      : `「${state.evolveTheme}」· ${allItems.length} 次出现 · 累计新增提法 ${totalAdd} 条`;
   }
 }
 
@@ -1223,6 +1267,15 @@ function bindEvents() {
       const btn = e.target.closest("button[data-theme]");
       if (!btn) return;
       state.evolveTheme = btn.dataset.theme;
+      renderEvolution();
+    });
+  }
+  // 「只看有新增」开关
+  if (els.evolveOnlyNew) {
+    els.evolveOnlyNew.addEventListener("click", () => {
+      state.evolveOnlyNew = !state.evolveOnlyNew;
+      els.evolveOnlyNew.classList.toggle("active", state.evolveOnlyNew);
+      els.evolveOnlyNew.setAttribute("aria-pressed", String(state.evolveOnlyNew));
       renderEvolution();
     });
   }
