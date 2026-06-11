@@ -27,6 +27,7 @@ const state = {
   leaderTheme: "all",
   evolveTheme: null,     // 提法流变当前选中主题
   evolveOnlyNew: false,  // 只看有新增提法的节点
+  cutStatus: "all",      // 切口台账状态筛选
   leaderSearch: "",
   leaderItems: [],       // 所有 leaders 信号缓存
   phraseCounts: {},      // phrase -> 累计反复次数（来自 chronology）
@@ -880,9 +881,50 @@ function renderFocus() {
    渲染：切口孵化库
    ------------------------------------------------------------ */
 
+/* ===== 切口台账：本地标记（采纳/已转化/搁置）+ 导出研究简报 ===== */
+const LEDGER_KEY = "cz_cut_ledger_v1";
+const CUT_STATUSES = ["采纳", "已转化", "搁置"];
+function cutLedger() { try { return JSON.parse(localStorage.getItem(LEDGER_KEY)) || {}; } catch (e) { return {}; } }
+function setCutStatus(id, st) {
+  const m = cutLedger();
+  if (st) m[id] = st; else delete m[id];
+  try { localStorage.setItem(LEDGER_KEY, JSON.stringify(m)); } catch (e) {}
+}
+function statusKey(s) { return ({ "采纳": "adopt", "已转化": "done", "搁置": "hold" })[s] || ""; }
+
+function exportCutMd(topic) {
+  if (!topic) return;
+  const L = [];
+  L.push(`# 研究切口简报：${topic.cut || topic.title || ""}`, "");
+  L.push(`- 主题：${topic.theme || ""}`);
+  L.push(`- 核心提法：${topic.phrase || ""}（反复 ${topic.count || 1}× · 首发 ${topic.first_date || ""} ${topic.first_occasion || ""} · 至 ${topic.last_date || ""}）`);
+  const st = cutLedger()[topic.id];
+  if (st) L.push(`- 台账状态：${st}`);
+  L.push("", "## 研判", topic.thesis || "", "", "## 切入点", topic.cut || "");
+  if ((topic.mechanism || []).length) { L.push("", "## 机制层抓手"); topic.mechanism.forEach((m) => L.push(`- ${m}`)); }
+  if ((topic.verification || []).length) { L.push("", "## 核验路径"); topic.verification.forEach((v) => L.push(`- ${v}`)); }
+  const sl = topic.signal_links || [];
+  if (sl.length) {
+    L.push("", "## 证据链（来源信号）");
+    sl.forEach((s) => {
+      if (s && typeof s === "object") L.push(`- ${[s.date, s.headline || s.title, s.url].filter(Boolean).join(" · ")}`);
+      else L.push(`- ${s}`);
+    });
+  }
+  L.push("", "---", `导出自 CZ Agent · 切口 ${topic.id}`);
+  const blob = new Blob([L.join("\n")], { type: "text/markdown;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `切口-${(topic.phrase || topic.id || "").slice(0, 20)}.md`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
 function buildCutCardEl(topic, isAuto) {
   const card = document.createElement("article");
   card.className = "cut-card";
+  const status = cutLedger()[topic.id] || "";
+  if (status) card.dataset.status = statusKey(status);
   const mechChips = (topic.mechanism || [])
     .map((m) => `<span class="mech-chip">${m}</span>`)
     .join("");
@@ -908,10 +950,22 @@ function buildCutCardEl(topic, isAuto) {
     ? `<div class="cut-keywords">${topic.keywords.slice(0, 5).map((k) => `<span class="kw-chip">${k}</span>`).join("")}</div>`
     : "";
 
+  const statusTag = status ? `<span class="ledger-tag t-${statusKey(status)}">${status}</span>` : "";
+  const ledgerBtns = ["待办", ...CUT_STATUSES].map((s) => {
+    const val = s === "待办" ? "" : s;
+    const on = (val === status) ? " on" : "";
+    return `<button class="ledger-btn${on}" data-act="status" data-cut="${topic.id}" data-status="${val}">${s}</button>`;
+  }).join("");
+  const ledgerHtml = isAuto ? `
+    <div class="cut-ledger">
+      <div class="ledger-btns">${ledgerBtns}</div>
+      <button class="cut-export" data-act="export" data-cut="${topic.id}">⤓ 导出简报</button>
+    </div>` : "";
+
   card.innerHTML = `
     <div class="cut-head">
       <div>
-        <div class="cut-theme">${topic.theme}</div>
+        <div class="cut-theme">${topic.theme}${statusTag}</div>
         <h3>${topic.cut}</h3>
       </div>
     </div>
@@ -919,15 +973,30 @@ function buildCutCardEl(topic, isAuto) {
     <div class="mechanism">${mechChips}</div>
     ${kwChips}
     <div class="cut-foot">${footHtml}</div>
+    ${ledgerHtml}
   `;
-  // open-btn 已下线（工作台隐藏中），不再绑定事件
   return card;
+}
+
+function renderLedgerFilter() {
+  const box = document.getElementById("ledgerFilter");
+  if (!box) return;
+  const led = cutLedger();
+  const counts = { all: 0, 待办: 0, 采纳: 0, 已转化: 0, 搁置: 0 };
+  (state.cuts || []).forEach((c) => { counts.all++; counts[led[c.id] || "待办"]++; });
+  const opts = [["all", "全部"], ["采纳", "采纳"], ["已转化", "已转化"], ["搁置", "搁置"], ["待办", "待办"]];
+  box.innerHTML = opts.map(([v, label]) =>
+    `<button class="ledger-fchip${state.cutStatus === v ? " on" : ""}" data-lstatus="${v}">${label} <span class="lf-n">${counts[v] || 0}</span></button>`
+  ).join("");
 }
 
 function renderCuts() {
   if (!els.cutGrid) return;
+  renderLedgerFilter();
   const query = state.search.toLowerCase().trim();
+  const led = cutLedger();
   const topics = filteredTopics().filter((t) => {
+    if (state.cutStatus !== "all" && (led[t.id] || "待办") !== state.cutStatus) return false;
     if (!query) return true;
     return [t.title, t.cut, t.theme, t.thesis, ...(t.keywords || [])]
       .join(" ").toLowerCase().includes(query);
@@ -940,7 +1009,7 @@ function renderCuts() {
   }
 
   const isAuto = state.cuts.length > 0;
-  const filterActive = state.selectedTheme !== "all" || !!query;
+  const filterActive = state.selectedTheme !== "all" || !!query || state.cutStatus !== "all";
 
   // 筛选/搜索激活 或 总量很少 → 直接平铺
   if (filterActive || topics.length <= 8) {
@@ -1268,6 +1337,30 @@ function bindEvents() {
       if (!btn) return;
       state.evolveTheme = btn.dataset.theme;
       renderEvolution();
+    });
+  }
+  // 切口台账：标记 / 导出（事件委托）
+  if (els.cutGrid) {
+    els.cutGrid.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-act]");
+      if (!b) return;
+      const id = b.dataset.cut;
+      if (b.dataset.act === "status") {
+        setCutStatus(id, b.dataset.status || "");
+        renderCuts();
+      } else if (b.dataset.act === "export") {
+        exportCutMd((state.cuts || []).find((c) => String(c.id) === String(id)));
+      }
+    });
+  }
+  // 切口台账状态筛选
+  const ledgerFilter = document.getElementById("ledgerFilter");
+  if (ledgerFilter) {
+    ledgerFilter.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-lstatus]");
+      if (!b) return;
+      state.cutStatus = b.dataset.lstatus;
+      renderCuts();
     });
   }
   // 「只看有新增」开关
