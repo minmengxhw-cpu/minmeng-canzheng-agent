@@ -1001,6 +1001,38 @@ function exportCutMd(topic) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
+function exportCutDoc(topic) {
+  if (!topic) return;
+  const E = evoEsc;
+  const li = (arr) => (arr || []).map((x) => `<li>${E(x)}</li>`).join("");
+  const sl = (topic.signal_links || []).map((s) =>
+    (s && typeof s === "object")
+      ? `<li>${E([s.date, s.headline || s.title, s.url].filter(Boolean).join(" · "))}</li>`
+      : `<li>${E(s)}</li>`
+  ).join("");
+  const st = cutLedger()[topic.id];
+  const html = `<html xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8">
+<style>body{font-family:"宋体",SimSun,serif;font-size:11pt;line-height:1.75;color:#1a1a1a}
+h1{font-size:16pt;margin:0 0 10px}h2{font-size:13pt;color:#9c2b21;margin:16px 0 6px;border-bottom:1px solid #ddd;padding-bottom:3px}
+ul{margin:4px 0 4px 18px}li{margin:3px 0}.meta{color:#444}</style></head><body>
+<h1>研究切口简报：${E(topic.cut || topic.title || "")}</h1>
+<p class="meta"><b>主题：</b>${E(topic.theme || "")}　<b>核心提法：</b>${E(topic.phrase || "")}<br>
+反复 ${topic.count || 1}× · 首发 ${E(topic.first_date || "")} ${E(topic.first_occasion || "")} · 至 ${E(topic.last_date || "")}${st ? `　·　台账状态：${E(st)}` : ""}</p>
+<h2>研判</h2><p>${E(topic.thesis || "")}</p>
+<h2>切入点</h2><p>${E(topic.cut || "")}</p>
+${(topic.mechanism || []).length ? `<h2>机制层抓手</h2><ul>${li(topic.mechanism)}</ul>` : ""}
+${(topic.verification || []).length ? `<h2>核验路径</h2><ul>${li(topic.verification)}</ul>` : ""}
+${sl ? `<h2>证据链（来源信号）</h2><ul>${sl}</ul>` : ""}
+<hr><p style="color:#888;font-size:9pt">导出自 CZ Agent · 切口 ${E(topic.id)}</p>
+</body></html>`;
+  const blob = new Blob(["﻿" + html], { type: "application/msword" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `研究切口-${(topic.phrase || topic.id || "").slice(0, 20)}.doc`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
 function buildCutCardEl(topic, isAuto) {
   const card = document.createElement("article");
   card.className = "cut-card";
@@ -1040,7 +1072,10 @@ function buildCutCardEl(topic, isAuto) {
   const ledgerHtml = isAuto ? `
     <div class="cut-ledger">
       <div class="ledger-btns">${ledgerBtns}</div>
-      <button class="cut-export" data-act="export" data-cut="${topic.id}">⤓ 导出简报</button>
+      <span class="cut-exports">
+        <button class="cut-export" data-act="exportDoc" data-cut="${topic.id}">⤓ Word</button>
+        <button class="cut-export ghost" data-act="export" data-cut="${topic.id}">MD</button>
+      </span>
     </div>` : "";
 
   card.innerHTML = `
@@ -1431,6 +1466,8 @@ function bindEvents() {
         renderCuts();
       } else if (b.dataset.act === "export") {
         exportCutMd((state.cuts || []).find((c) => String(c.id) === String(id)));
+      } else if (b.dataset.act === "exportDoc") {
+        exportCutDoc((state.cuts || []).find((c) => String(c.id) === String(id)));
       }
     });
   }

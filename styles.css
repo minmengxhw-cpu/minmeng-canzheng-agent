@@ -2889,3 +2889,6 @@ a.bi-head:hover { color: var(--accent,#9c2b21); text-decoration: underline; }
 .life-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .life-role { font-size: 11px; color: #fff; background: var(--accent,#9c2b21); border-radius: 8px; padding: 1px 9px; }
 .life-theme { font-size: 11px; color: var(--muted,#7a766c); background: var(--card2,#f3f1ea); border-radius: 8px; padding: 1px 9px; }
+
+.cut-exports { display: inline-flex; gap: 6px; }
+.cut-export.ghost { color: var(--ink2,#463f34); border-color: var(--line,#e6e3da); }
