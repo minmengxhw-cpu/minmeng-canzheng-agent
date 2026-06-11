@@ -16185,9 +16185,10 @@
     "first_occasion": "市委常委会会议",
     "first_title": "",
     "first_url": "https://www.shanghai.gov.cn/nw4411/20260508/0ebf3dafd0a949b499ed60ca3a7c1633.html",
-    "count": 1,
+    "count": 2,
     "themes": [
-      "城市治理"
+      "城市治理",
+      "生态环境"
     ]
   },
   {
@@ -17882,6 +17883,19 @@
     ]
   },
   {
+    "phrase": "绿色低碳成为基地的鲜明标识",
+    "first_date": "2026-06-11",
+    "first_role": "市委书记",
+    "first_theme": "生态环境",
+    "first_occasion": "老港生态环保基地调研",
+    "first_title": "",
+    "first_url": "https://view.inews.qq.com/a/20260611A09IMB00",
+    "count": 1,
+    "themes": [
+      "生态环境"
+    ]
+  },
+  {
     "phrase": "持之以恒解决大党独有难题的强大意志",
     "first_date": "2026-06-11",
     "first_role": "市长",
@@ -17905,6 +17919,84 @@
     "count": 1,
     "themes": [
       "城市治理"
+    ]
+  },
+  {
+    "phrase": "体育成为城市核心竞争力和软实力的一张金名片",
+    "first_date": "2026-06-11",
+    "first_role": "市长",
+    "first_theme": "文化教育",
+    "first_occasion": "调研体育产业并出席男篮总结大会",
+    "first_title": "",
+    "first_url": "https://view.inews.qq.com/a/20260611A09KNZ00",
+    "count": 1,
+    "themes": [
+      "文化教育"
+    ]
+  },
+  {
+    "phrase": "明日之星新锐计划",
+    "first_date": "2026-06-11",
+    "first_role": "市长",
+    "first_theme": "文化教育",
+    "first_occasion": "调研体育产业并出席男篮总结大会",
+    "first_title": "",
+    "first_url": "https://view.inews.qq.com/a/20260611A09KNZ00",
+    "count": 1,
+    "themes": [
+      "文化教育"
+    ]
+  },
+  {
+    "phrase": "为国际消费中心城市注入篮球动能",
+    "first_date": "2026-06-11",
+    "first_role": "市长",
+    "first_theme": "文化教育",
+    "first_occasion": "调研体育产业并出席男篮总结大会",
+    "first_title": "",
+    "first_url": "https://view.inews.qq.com/a/20260611A09KNZ00",
+    "count": 1,
+    "themes": [
+      "文化教育"
+    ]
+  },
+  {
+    "phrase": "双主宾城机制",
+    "first_date": "2026-06-11",
+    "first_role": "市长",
+    "first_theme": "科技产业",
+    "first_occasion": "第十二届上交会开幕并巡馆",
+    "first_title": "",
+    "first_url": "https://view.inews.qq.com/a/20260611A090L700",
+    "count": 1,
+    "themes": [
+      "科技产业"
+    ]
+  },
+  {
+    "phrase": "技术贸易新生态",
+    "first_date": "2026-06-11",
+    "first_role": "市长",
+    "first_theme": "科技产业",
+    "first_occasion": "第十二届上交会开幕并巡馆",
+    "first_title": "",
+    "first_url": "https://view.inews.qq.com/a/20260611A090L700",
+    "count": 1,
+    "themes": [
+      "科技产业"
+    ]
+  },
+  {
+    "phrase": "全链条服务闭环",
+    "first_date": "2026-06-11",
+    "first_role": "市长",
+    "first_theme": "科技产业",
+    "first_occasion": "第十二届上交会开幕并巡馆",
+    "first_title": "",
+    "first_url": "https://view.inews.qq.com/a/20260611A090L700",
+    "count": 1,
+    "themes": [
+      "科技产业"
     ]
   }
 ]
