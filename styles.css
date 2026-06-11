@@ -2892,3 +2892,63 @@ a.bi-head:hover { color: var(--accent,#9c2b21); text-decoration: underline; }
 
 .cut-exports { display: inline-flex; gap: 6px; }
 .cut-export.ghost { color: var(--ink2,#463f34); border-color: var(--line,#e6e3da); }
+
+/* ============ 重排 v2：本周看点 strip + 提法洞察标签页 ============ */
+
+/* 本周看点：嵌入领导动向块内的高注意力速览条 */
+.focus-strip { margin: 4px 0 22px; }
+.focus-strip-head {
+  font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: none;
+  color: var(--accent, #C8634E); margin: 0 0 12px;
+  display: flex; align-items: center; gap: 8px;
+}
+.focus-strip-head::before {
+  content: ""; width: 18px; height: 2px; background: var(--accent, #C8634E); border-radius: 2px;
+}
+/* strip 内的卡片更紧凑一些，三栏并排 */
+.focus-strip .focus-grid { gap: 12px; }
+
+/* 提法洞察：标签切换面板 */
+#insight .block-head { align-items: flex-start; }
+.insight-pane { animation: insFade .2s ease; }
+@keyframes insFade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.ins-subhead {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+  margin: 0 0 16px; flex-wrap: wrap;
+}
+.ins-desc {
+  font-size: 13px; line-height: 1.6; color: var(--ink-mute, #8E8E8E);
+  margin: 0; max-width: 640px; flex: 1 1 360px;
+}
+.ins-subhead .scope-tag { flex-shrink: 0; }
+
+/* 移动端：看点 strip 卡片改为可横滑，避免纵向再拉长 */
+@media (max-width: 720px) {
+  .focus-strip { margin-bottom: 18px; }
+  .focus-strip .focus-grid {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 86%;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 6px;
+    scrollbar-width: none;
+  }
+  .focus-strip .focus-grid::-webkit-scrollbar { display: none; }
+  .focus-strip .focus-card { scroll-snap-align: start; }
+  #insight .block-head { flex-direction: column; gap: 10px; }
+  #insightTabs { align-self: flex-start; }
+}
+
+/* 提法流变：更早表述折叠 */
+.evo-earlier { margin: 0 0 14px; border: 1px solid var(--line, #E8E5DD); border-radius: 12px; background: var(--surface, #fff); overflow: hidden; }
+.evo-earlier-summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px;
+  padding: 12px 15px; font-size: 13px; color: var(--ink-soft, #4A4A4A); font-weight: 600;
+}
+.evo-earlier-summary::-webkit-details-marker { display: none; }
+.evo-earlier-chev { transition: transform .2s ease; color: var(--ink-mute, #8E8E8E); }
+.evo-earlier[open] .evo-earlier-chev { transform: rotate(90deg); }
+.evo-earlier-range { margin-left: auto; font-size: 11.5px; color: var(--ink-mute, #8E8E8E); font-variant-numeric: tabular-nums; font-weight: 400; }
+.evo-earlier .evo-timeline { padding: 4px 15px 14px; }
