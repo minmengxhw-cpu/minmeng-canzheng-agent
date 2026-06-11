@@ -383,9 +383,11 @@ function renderEvolution() {
   // 「只看有新增」开关：仅保留有新提法的节点
   const items = state.evolveOnlyNew ? allItems.filter((s) => evoNP(s).length) : allItems;
 
-  const nodes = items.map((s, i) => {
+  // 单节点渲染（提取为函数，便于"最近 N 条平铺 + 更早折叠"复用）
+  const lastIdx = items.length - 1;
+  const renderEvoNode = (s, i) => {
     const np = evoNP(s);
-    const isLatest = i === items.length - 1;
+    const isLatest = i === lastIdx;
     const occ = s.headline || s.occasion || "";
     const roleTag = s.role ? `<span class="evo-role">${evoEsc(s.role)}</span>` : "";
     const phrasesHtml = np.length
@@ -402,10 +404,31 @@ function renderEvolution() {
         <div class="evo-foot">${cmp}${src}</div>
       </div>
     </li>`;
-  }).join("");
+  };
+
+  // 默认只平铺最近 8 次表述，更早的收进折叠，避免长主题铺出几十屏
+  const EVO_SHOW = 8;
+  let bodyHtml;
+  if (items.length > EVO_SHOW) {
+    const splitAt = items.length - EVO_SHOW;            // 时间正序：前段为更早
+    const earlier = items.slice(0, splitAt);
+    const recent = items.slice(splitAt);
+    bodyHtml = `
+      <details class="evo-earlier">
+        <summary class="evo-earlier-summary">
+          <span class="evo-earlier-chev">▸</span>
+          <span>查看更早 ${earlier.length} 次表述</span>
+          <span class="evo-earlier-range">${evoEsc((earlier[0].date || ""))} → ${evoEsc((earlier[earlier.length - 1].date || ""))}</span>
+        </summary>
+        <ol class="evo-timeline">${earlier.map((s, i) => renderEvoNode(s, i)).join("")}</ol>
+      </details>
+      <ol class="evo-timeline">${recent.map((s, i) => renderEvoNode(s, splitAt + i)).join("")}</ol>`;
+  } else {
+    bodyHtml = `<ol class="evo-timeline">${items.map((s, i) => renderEvoNode(s, i)).join("")}</ol>`;
+  }
 
   els.evolveBody.innerHTML = items.length
-    ? `<ol class="evo-timeline">${nodes}</ol>`
+    ? bodyHtml
     : '<p class="evo-empty">该主题在当前筛选下暂无记录。</p>';
   if (els.evolveStat) {
     els.evolveStat.textContent = state.evolveOnlyNew
@@ -1196,6 +1219,8 @@ function renderCuts() {
    ------------------------------------------------------------ */
 
 function renderSignals() {
+  // 信号雷达已下线（与领导动向时间轴重叠、且原数据为演示数据）。保留空守卫避免空引用。
+  if (!els.signalList) return;
   const signals = [...filteredSignals()].sort(
     (a, b) => (b.date || "").localeCompare(a.date || "")
   );
@@ -1397,8 +1422,26 @@ function bindEvents() {
     state.selectedTheme = e.target.value;
     renderFocus();
     renderCuts();
-    renderSignals();
   });
+
+  // 提法洞察：流变 / 生命周期 标签切换
+  const insightTabs = document.getElementById("insightTabs");
+  if (insightTabs) {
+    insightTabs.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-ins]");
+      if (!btn) return;
+      const view = btn.dataset.ins;
+      insightTabs.querySelectorAll(".tab").forEach((t) => {
+        const on = t === btn;
+        t.classList.toggle("active", on);
+        t.setAttribute("aria-selected", String(on));
+      });
+      const evo = document.getElementById("insEvolve");
+      const life = document.getElementById("insLife");
+      if (evo) evo.hidden = view !== "evolve";
+      if (life) life.hidden = view !== "life";
+    });
+  }
 
   els.cutSearch.addEventListener("input", (e) => {
     state.search = e.target.value;
@@ -1545,7 +1588,6 @@ function init() {
   renderLeaders();
   renderFocus();
   renderCuts();
-  renderSignals();
   renderWorkbench();
   renderSources();
   renderMeta();
