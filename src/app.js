@@ -28,6 +28,7 @@ const state = {
   evolveTheme: null,     // 提法流变当前选中主题
   evolveOnlyNew: false,  // 只看有新增提法的节点
   cutStatus: "all",      // 切口台账状态筛选
+  lifeFilter: "all",     // 提法生命周期筛选
   leaderSearch: "",
   leaderItems: [],       // 所有 leaders 信号缓存
   phraseCounts: {},      // phrase -> 累计反复次数（来自 chronology）
@@ -61,6 +62,9 @@ const els = {
   evolveStat: $("#evolveStat"),
   evolveRecent: $("#evolveRecent"),
   evolveOnlyNew: $("#evolveOnlyNew"),
+  lifeFilter: $("#lifeFilter"),
+  lifeBody: $("#lifeBody"),
+  lifeStat: $("#lifeStat"),
   outputTabs: $("#outputTabs"),
   workbenchTitle: $("#workbenchTitle"),
   activeCut: $("#activeCut"),
@@ -222,6 +226,83 @@ async function renderLeaders() {
   renderLeaderTimeline();
   renderEvolveRecent();
   renderEvolution();
+  renderLifecycle();
+}
+
+/* ============ 提法生命周期 ============ */
+function lifeDays(a, b) {
+  const pa = a.split("-").map(Number), pb = b.split("-").map(Number);
+  return Math.round((Date.UTC(pb[0], pb[1] - 1, pb[2]) - Date.UTC(pa[0], pa[1] - 1, pa[2])) / 86400000);
+}
+const LIFE_STAGE = { "核心": "core", "成长": "grow", "稳定": "stable", "沉寂": "dormant" };
+
+function lifeAggregate() {
+  const m = {};
+  state.leaderItems.forEach((s) => {
+    if (!s.date) return;
+    evoNP(s).forEach((p) => {
+      p = (p || "").trim();
+      if (!p) return;
+      if (!m[p]) m[p] = { dates: [], themes: new Set(), roles: new Set() };
+      m[p].dates.push(s.date);
+      if (s.theme) m[p].themes.add(s.theme);
+      if (s.role) m[p].roles.add(s.role);
+    });
+  });
+  return m;
+}
+
+function renderLifecycle() {
+  if (!els.lifeBody) return;
+  const dates = state.leaderItems.map((s) => s.date).filter(Boolean).sort();
+  if (!dates.length) { els.lifeBody.innerHTML = '<p class="evo-empty">暂无数据。</p>'; return; }
+  const maxd = dates[dates.length - 1];
+  const m = lifeAggregate();
+  const totalPhrases = Object.keys(m).length;
+
+  let rows = Object.keys(m).map((p) => {
+    const ds = m[p].dates.slice().sort();
+    const count = ds.length, first = ds[0], last = ds[count - 1];
+    const dormant = lifeDays(last, maxd);
+    let stage;
+    if (count >= 3 && dormant > 45) stage = "沉寂";
+    else if (count >= 5) stage = "核心";
+    else if (dormant <= 21) stage = "成长";
+    else stage = "稳定";
+    return { p, count, first, last, span: lifeDays(first, last), dormant, themes: [...m[p].themes], roles: [...m[p].roles], stage };
+  }).filter((r) => r.count >= 2);
+
+  const oneOff = totalPhrases - rows.length;
+  const cnt = { 核心: 0, 成长: 0, 稳定: 0, 沉寂: 0 };
+  rows.forEach((r) => cnt[r.stage]++);
+
+  // 筛选 chips
+  const opts = [["all", "全部立住", rows.length], ["核心", "核心", cnt.核心], ["成长", "成长", cnt.成长], ["沉寂", "沉寂预警", cnt.沉寂]];
+  if (!["all", "核心", "成长", "沉寂"].includes(state.lifeFilter)) state.lifeFilter = "all";
+  if (els.lifeFilter) {
+    els.lifeFilter.innerHTML = opts.map(([v, label, n]) =>
+      `<button type="button" class="filter-chip ${state.lifeFilter === v ? "active" : ""}" data-life="${v}">${label} <span class="chip-n">${n}</span></button>`
+    ).join("");
+  }
+
+  let view = state.lifeFilter === "all" ? rows : rows.filter((r) => r.stage === state.lifeFilter);
+  view.sort((a, b) => state.lifeFilter === "沉寂" ? (b.dormant - a.dormant) : (b.count - a.count || b.last.localeCompare(a.last)));
+
+  els.lifeBody.innerHTML = view.length ? `<ol class="life-list">${view.map((r) => {
+    const sk = LIFE_STAGE[r.stage];
+    const themeTags = r.themes.map((t) => `<span class="life-theme">${evoEsc(t)}</span>`).join("");
+    const roleTags = r.roles.map((t) => `<span class="life-role">${evoEsc(t)}</span>`).join("");
+    const dormTxt = r.stage === "沉寂" ? ` · <span class="life-dorm">已 ${r.dormant} 天未现</span>` : "";
+    return `<li class="life-node st-${sk}">
+      <div class="life-top"><span class="life-phrase">${evoEsc(r.p)}</span><span class="life-badge b-${sk}">${r.stage}</span></div>
+      <div class="life-meta">反复 <b>${r.count}×</b> · ${r.first} → ${r.last} · 跨度 ${r.span} 天${dormTxt}</div>
+      <div class="life-tags">${roleTags}${themeTags}</div>
+    </li>`;
+  }).join("")}</ol>` : '<p class="evo-empty">该筛选下暂无提法。</p>';
+
+  if (els.lifeStat) {
+    els.lifeStat.textContent = `立住 ${rows.length} 条（核心${cnt.核心}·成长${cnt.成长}·沉寂${cnt.沉寂}）· 另 ${oneOff} 条一次性`;
+  }
 }
 
 /* ============ 提法流变：同主题历次表述演变 ============ */
@@ -1370,6 +1451,15 @@ function bindEvents() {
       els.evolveOnlyNew.classList.toggle("active", state.evolveOnlyNew);
       els.evolveOnlyNew.setAttribute("aria-pressed", String(state.evolveOnlyNew));
       renderEvolution();
+    });
+  }
+  // 提法生命周期筛选
+  if (els.lifeFilter) {
+    els.lifeFilter.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-life]");
+      if (!btn) return;
+      state.lifeFilter = btn.dataset.life;
+      renderLifecycle();
     });
   }
 }
