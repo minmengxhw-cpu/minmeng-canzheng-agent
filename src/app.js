@@ -25,6 +25,7 @@ const state = {
   search: "",
   leaderRole: "all",     // all | 陈吉宁 | 龚正
   leaderTheme: "all",
+  evolveTheme: null,     // 提法流变当前选中主题
   leaderSearch: "",
   leaderItems: [],       // 所有 leaders 信号缓存
   phraseCounts: {},      // phrase -> 累计反复次数（来自 chronology）
@@ -53,6 +54,9 @@ const els = {
   cutSearch: $("#cutSearch"),
   signalList: $("#signalList"),
   signalScope: $("#signalScope"),
+  evolveThemes: $("#evolveThemes"),
+  evolveBody: $("#evolveBody"),
+  evolveStat: $("#evolveStat"),
   outputTabs: $("#outputTabs"),
   workbenchTitle: $("#workbenchTitle"),
   activeCut: $("#activeCut"),
@@ -212,6 +216,76 @@ async function renderLeaders() {
   renderTrendChart();
   renderPhraseCloud();
   renderLeaderTimeline();
+  renderEvolution();
+}
+
+/* ============ 提法流变：同主题历次表述演变 ============ */
+
+function evoEsc(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function evoThemeCounts() {
+  const cnt = {};
+  state.leaderItems.forEach((s) => { if (s.theme) cnt[s.theme] = (cnt[s.theme] || 0) + 1; });
+  return cnt;
+}
+
+function renderEvolution() {
+  if (!els.evolveBody) return;
+  const cnt = evoThemeCounts();
+  const themes = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]);
+  if (!themes.length) {
+    els.evolveBody.innerHTML = '<p class="evo-empty">暂无可展示的主题数据。</p>';
+    if (els.evolveThemes) els.evolveThemes.innerHTML = "";
+    if (els.evolveStat) els.evolveStat.textContent = "";
+    return;
+  }
+  if (!state.evolveTheme || !themes.includes(state.evolveTheme)) state.evolveTheme = themes[0];
+
+  // 主题筛选 chips（复用 .filter-chip 样式）
+  if (els.evolveThemes) {
+    els.evolveThemes.innerHTML = themes.map((t) =>
+      `<button type="button" class="filter-chip ${t === state.evolveTheme ? "active" : ""}" data-theme="${evoEsc(t)}">${evoEsc(t)} <span class="chip-n">${cnt[t]}</span></button>`
+    ).join("");
+  }
+
+  // 该主题信号，按日期正序（从早到晚）
+  const items = state.leaderItems
+    .filter((s) => s.theme === state.evolveTheme && s.date)
+    .slice()
+    .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+
+  let addCount = 0;
+  const nodes = items.map((s, i) => {
+    const np = Array.isArray(s.new_phrasing) ? s.new_phrasing : (s.new_phrasing ? [s.new_phrasing] : []);
+    addCount += np.length;
+    const isLatest = i === items.length - 1;
+    const occ = s.headline || s.occasion || "";
+    const roleTag = s.role ? `<span class="evo-role">${evoEsc(s.role)}</span>` : "";
+    const phrasesHtml = np.length
+      ? `<ul class="evo-phrases">${np.map((p) => `<li>${evoEsc(p)}</li>`).join("")}</ul>`
+      : '<p class="evo-keep">延续既有表述，无新增提法</p>';
+    const cmp = (s.compared_to && s.compared_to.date) ? `<span class="evo-cmp">较 ${evoEsc(s.compared_to.date)} 同主题</span>` : "";
+    const src = s.url ? `<a class="evo-src" href="${evoEsc(s.url)}" target="_blank" rel="noopener">原文 ↗</a>` : "";
+    return `<li class="evo-node${isLatest ? " is-latest" : ""}">
+      <span class="evo-dot"></span>
+      <div class="evo-meta"><span class="evo-date">${evoEsc(s.date)}</span>${roleTag}${isLatest ? '<span class="evo-latest">最新</span>' : ""}</div>
+      <div class="evo-card">
+        <div class="evo-occ">${evoEsc(occ)}</div>
+        ${phrasesHtml}
+        <div class="evo-foot">${cmp}${src}</div>
+      </div>
+    </li>`;
+  }).join("");
+
+  els.evolveBody.innerHTML = items.length
+    ? `<ol class="evo-timeline">${nodes}</ol>`
+    : '<p class="evo-empty">该主题暂无记录。</p>';
+  if (els.evolveStat) {
+    els.evolveStat.textContent = `「${state.evolveTheme}」· ${items.length} 次出现 · 累计新增提法 ${addCount} 条`;
+  }
 }
 
 /* ============ 月度主题趋势图 ============ */
@@ -1141,6 +1215,15 @@ function bindEvents() {
       renderTrendChart();
       renderPhraseCloud();
       renderLeaderTimeline();
+    });
+  }
+  // 提法流变主题切换
+  if (els.evolveThemes) {
+    els.evolveThemes.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-theme]");
+      if (!btn) return;
+      state.evolveTheme = btn.dataset.theme;
+      renderEvolution();
     });
   }
 }
