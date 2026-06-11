@@ -2867,3 +2867,25 @@ a.bi-head:hover { color: var(--accent,#9c2b21); text-decoration: underline; }
   background: transparent; border: 1px solid rgba(156,43,33,.4); border-radius: 7px; padding: 4px 11px;
 }
 .cut-export:hover { background: #fdf0ec; }
+
+/* ============ 提法生命周期 ============ */
+.life-filter { flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.life-filter .chip-n { font-size: 11px; opacity: .6; margin-left: 2px; }
+.life-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 11px; }
+.life-node {
+  background: var(--card,#fbfaf6); border: 1px solid var(--line,#e6e3da); border-radius: 12px;
+  padding: 13px 15px; border-left: 4px solid var(--line,#e6e3da);
+}
+.life-node.st-core { border-left-color: #9c2b21; }
+.life-node.st-grow { border-left-color: #2f7a4f; }
+.life-node.st-stable { border-left-color: #9c7a36; }
+.life-node.st-dormant { border-left-color: #8a8a82; background: #f6f5f1; }
+.life-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.life-phrase { font-size: 14.5px; font-weight: 600; color: var(--ink,#2a2620); line-height: 1.5; }
+.life-badge { flex-shrink: 0; font-size: 11px; color: #fff; border-radius: 8px; padding: 2px 10px; letter-spacing: .5px; }
+.b-core { background: #9c2b21; } .b-grow { background: #2f7a4f; } .b-stable { background: #9c7a36; } .b-dormant { background: #8a8a82; }
+.life-meta { font-size: 12.5px; color: var(--ink2,#463f34); font-variant-numeric: tabular-nums; }
+.life-dorm { color: #9c2b21; font-weight: 600; }
+.life-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.life-role { font-size: 11px; color: #fff; background: var(--accent,#9c2b21); border-radius: 8px; padding: 1px 9px; }
+.life-theme { font-size: 11px; color: var(--muted,#7a766c); background: var(--card2,#f3f1ea); border-radius: 8px; padding: 1px 9px; }

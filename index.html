@@ -19,6 +19,7 @@
           <a href="#cuts">候选切口</a>
           <a href="#radar">信号雷达</a>
           <a href="#evolve">提法流变</a>
+          <a href="#lifecycle">生命周期</a>
           <a href="#workbench" hidden>工作台</a>
         </nav>
       </div>
@@ -143,6 +144,22 @@
           <button type="button" class="evo-toggle" id="evolveOnlyNew" aria-pressed="false">只看有新增</button>
         </div>
         <div class="evolve-body" id="evolveBody" aria-live="polite"></div>
+      </section>
+
+      <!-- 提法生命周期：立住 / 成长 / 沉寂 -->
+      <section class="block" id="lifecycle">
+        <div class="block-head">
+          <div>
+            <p class="eyebrow">提法生命周期</p>
+            <h2>提法从首现到立住 / 沉寂</h2>
+            <p class="lede">看一个提法首次出现后是反复进入话语体系，还是只出现一次就消失；曾高频却长期不再提的，是值得警觉的"退场信号"。</p>
+          </div>
+          <div class="block-tools">
+            <span class="scope-tag" id="lifeStat"></span>
+          </div>
+        </div>
+        <div class="filter-row life-filter" id="lifeFilter" role="tablist" aria-label="生命周期筛选"></div>
+        <div class="life-body" id="lifeBody" aria-live="polite"></div>
       </section>
 
       <!-- 成果工作台（暂时不显示前台，保留代码后续启用） -->
