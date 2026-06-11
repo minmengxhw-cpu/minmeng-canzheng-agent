@@ -851,12 +851,12 @@ function renderFocus() {
   // 真信号驱动：从近 7 天 state.leaderItems 自动评出 Top 3
   // state.leaderItems 还没就绪时，回退到旧的静态 topic 模式
   if (!state.leaderItems.length) {
-    els.focusEyebrow.textContent = `本周关注 · ${md} · 加载中…`;
+    els.focusEyebrow.textContent = `本周领导主要活动 · ${md} · 加载中…`;
     return;
   }
 
   if (els.focusEyebrow) {
-    els.focusEyebrow.textContent = `本周关注 · ${md} · 基于近 7 天市委活动自动研判`;
+    els.focusEyebrow.textContent = `本周领导主要活动 · ${md} · 基于近 7 天市委活动自动研判`;
   }
 
   // 近 7 天的活动
@@ -1550,8 +1550,9 @@ function bindEvents() {
 
 /* ============ 动向速递卡片 ============ */
 async function renderBrief() {
-  const card = document.getElementById("briefCard");
-  if (!card) return;
+  // 动向速递已合并为「领导主要活动」标题下的一行当日摘要（不再单独成卡、不再重复列条目）
+  const bar = document.getElementById("briefBar");
+  if (!bar) return;
   let b;
   try {
     const r = await fetch("./data/brief_latest.json", { cache: "no-store" });
@@ -1561,25 +1562,9 @@ async function renderBrief() {
   if (!b || !b.summary) return;
   const dEl = document.getElementById("briefDate");
   const sEl = document.getElementById("briefSummary");
-  const iEl = document.getElementById("briefItems");
-  if (dEl) dEl.textContent = (b.date || "") + (b.generated_at ? " · 更新 " + b.generated_at : "");
   if (sEl) sEl.textContent = b.summary;
-  const items = (b.today && b.today.items) || [];
-  if (iEl) {
-    iEl.innerHTML = items.map((i) => {
-      const role = i.role ? `<span class="bi-role">${evoEsc(i.role)}</span>` : "";
-      const ph = (i.phrases || []).map((p) => `<li>${evoEsc(p)}</li>`).join("");
-      const head = i.url
-        ? `<a class="bi-head" href="${evoEsc(i.url)}" target="_blank" rel="noopener">${evoEsc(i.headline)} ↗</a>`
-        : `<span class="bi-head">${evoEsc(i.headline)}</span>`;
-      return `<div class="brief-item">
-        <div class="bi-top">${role}<span class="bi-theme">${evoEsc(i.theme)}</span></div>
-        ${head}
-        ${ph ? `<ul class="bi-phrases">${ph}</ul>` : '<p class="bi-keep">无新增提法</p>'}
-      </div>`;
-    }).join("") || '<p class="bi-keep">当日无新增信号。</p>';
-  }
-  card.hidden = false;
+  if (dEl) dEl.textContent = b.date ? `更新 ${b.date}` : "";
+  bar.hidden = false;
 }
 
 function init() {

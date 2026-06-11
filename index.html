@@ -22,27 +22,22 @@
     </header>
 
     <main>
-      <!-- ========== ① 今日动向：领导讲话与表述变化（最高优先） ========== -->
+      <!-- ========== ① 今日动向：领导主要活动（最高优先） ========== -->
       <section class="leaders" id="leaders">
-        <!-- 动向速递：当日变化主动呈现，置于首屏第一眼 -->
-        <div class="brief-card" id="briefCard" hidden>
-          <div class="brief-head">
-            <span class="brief-badge">📍 动向速递</span>
-            <span class="brief-date" id="briefDate"></span>
-          </div>
-          <p class="brief-summary" id="briefSummary"></p>
-          <div class="brief-items" id="briefItems"></div>
-        </div>
-
         <div class="focus-head">
           <p class="eyebrow" id="leadersEyebrow">市委关注 · 最高优先</p>
           <h1>市委主要领导讲话与表述变化</h1>
-          <p class="lede">追踪书记、市长公开讲话，识别关注点漂移——参政议政的第一信号。</p>
+          <!-- 动向速递合并为标题下一行当日摘要（不再单独成卡，避免与下方活动卡重复） -->
+          <p class="brief-line" id="briefBar" hidden>
+            <span class="brief-badge">📍 今日</span>
+            <span class="brief-summary" id="briefSummary"></span>
+            <span class="brief-date" id="briefDate"></span>
+          </p>
         </div>
 
-        <!-- 本周看点 Top3（高注意力速览，点击直达下方时间轴） -->
+        <!-- 一打开第一眼：本周领导主要活动 Top3（点击直达下方时间轴） -->
         <div class="focus-strip">
-          <p class="focus-strip-head" id="focusEyebrow">本周看点</p>
+          <p class="focus-strip-head" id="focusEyebrow">本周领导主要活动</p>
           <div class="focus-grid" id="focusGrid" aria-live="polite"></div>
         </div>
 
