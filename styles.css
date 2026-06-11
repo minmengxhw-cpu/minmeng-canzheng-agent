@@ -2731,3 +2731,54 @@ p { margin: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
+
+/* ============ 提法流变（同主题演变时间线） ============ */
+.evolve-themes { flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.evolve-themes .chip-n {
+  font-size: 11px; opacity: .6; margin-left: 3px; font-variant-numeric: tabular-nums;
+}
+.evolve-body { margin-top: 4px; }
+.evo-empty { color: var(--muted, #8a8a82); font-size: 14px; padding: 24px 0; }
+
+.evo-timeline {
+  list-style: none; margin: 0; padding: 0 0 0 22px; position: relative;
+}
+.evo-timeline::before {
+  content: ""; position: absolute; left: 5px; top: 6px; bottom: 6px;
+  width: 2px; background: var(--line, #e6e3da);
+}
+.evo-node { position: relative; padding: 0 0 22px 18px; }
+.evo-node:last-child { padding-bottom: 4px; }
+.evo-dot {
+  position: absolute; left: -22px; top: 4px; width: 12px; height: 12px; border-radius: 50%;
+  background: #fff; border: 2px solid var(--accent, #9c2b21); box-sizing: border-box;
+}
+.evo-node.is-latest .evo-dot { background: var(--accent, #9c2b21); box-shadow: 0 0 0 4px rgba(156,43,33,.12); }
+
+.evo-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.evo-date { font-size: 13px; font-weight: 700; color: var(--ink, #2a2620); font-variant-numeric: tabular-nums; }
+.evo-role {
+  font-size: 11px; color: var(--muted, #7a766c); background: var(--card2, #f3f1ea);
+  border-radius: 10px; padding: 1px 9px;
+}
+.evo-latest {
+  font-size: 11px; color: #fff; background: var(--accent, #9c2b21);
+  border-radius: 10px; padding: 1px 9px; letter-spacing: 1px;
+}
+.evo-card {
+  background: var(--card, #fbfaf6); border: 1px solid var(--line, #e6e3da);
+  border-radius: 12px; padding: 13px 15px;
+}
+.evo-node.is-latest .evo-card { border-color: rgba(156,43,33,.4); background: #fdf8f4; }
+.evo-occ { font-size: 14px; font-weight: 600; color: var(--ink, #2a2620); line-height: 1.5; margin-bottom: 8px; }
+.evo-phrases { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.evo-phrases li {
+  font-size: 13.5px; line-height: 1.6; color: var(--ink2, #463f34);
+  padding: 6px 11px; background: var(--card2, #f3f1ea); border-radius: 8px;
+  border-left: 3px solid var(--accent, #9c2b21);
+}
+.evo-keep { font-size: 13px; color: var(--muted, #8a8a82); margin: 0; font-style: italic; }
+.evo-foot { display: flex; align-items: center; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
+.evo-cmp { font-size: 12px; color: var(--muted, #7a766c); }
+.evo-src { font-size: 12.5px; color: var(--accent, #9c2b21); text-decoration: none; font-weight: 600; }
+.evo-src:hover { text-decoration: underline; }

@@ -18,6 +18,7 @@
           <a href="#focus">本周关注</a>
           <a href="#cuts">候选切口</a>
           <a href="#radar">信号雷达</a>
+          <a href="#evolve">提法流变</a>
           <a href="#workbench" hidden>工作台</a>
         </nav>
       </div>
@@ -113,6 +114,22 @@
         <ol class="signal-stream" id="signalList"></ol>
       </section>
 
+      <!-- 提法流变：同主题历次表述演变 -->
+      <section class="block" id="evolve">
+        <div class="block-head">
+          <div>
+            <p class="eyebrow">提法流变</p>
+            <h2>同主题提法演变</h2>
+            <p class="lede">把同一主题的历次公开表述按时间串联，看新提法是怎样一步步加入话语体系的。每条均可点原文追溯。</p>
+          </div>
+          <div class="block-tools">
+            <span class="scope-tag" id="evolveStat"></span>
+          </div>
+        </div>
+        <div class="filter-row evolve-themes" id="evolveThemes" role="tablist" aria-label="主题筛选"></div>
+        <div class="evolve-body" id="evolveBody" aria-live="polite"></div>
+      </section>
+
       <!-- 成果工作台（暂时不显示前台，保留代码后续启用） -->
       <section class="block workbench" id="workbench" hidden>
         <div class="block-head">
@@ -158,6 +175,10 @@
       <a href="#radar" class="m-nav-item">
         <span class="m-icon" aria-hidden="true">∙</span>
         <span>信号</span>
+      </a>
+      <a href="#evolve" class="m-nav-item">
+        <span class="m-icon" aria-hidden="true">⇌</span>
+        <span>流变</span>
       </a>
       <a href="#workbench" class="m-nav-item" hidden>
         <span class="m-icon" aria-hidden="true">▤</span>
