@@ -1549,23 +1549,8 @@ function bindEvents() {
    ------------------------------------------------------------ */
 
 /* ============ 动向速递卡片 ============ */
-async function renderBrief() {
-  // 动向速递已合并为「领导主要活动」标题下的一行当日摘要（不再单独成卡、不再重复列条目）
-  const bar = document.getElementById("briefBar");
-  if (!bar) return;
-  let b;
-  try {
-    const r = await fetch("./data/brief_latest.json", { cache: "no-store" });
-    if (!r.ok) return;
-    b = await r.json();
-  } catch (e) { return; }
-  if (!b || !b.summary) return;
-  const dEl = document.getElementById("briefDate");
-  const sEl = document.getElementById("briefSummary");
-  if (sEl) sEl.textContent = b.summary;
-  if (dEl) dEl.textContent = b.date ? `更新 ${b.date}` : "";
-  bar.hidden = false;
-}
+// 动向速递已彻底移除（首屏直接是领导主要活动卡片，不再有当日摘要行）
+async function renderBrief() { /* no-op：保留空函数避免 init 调用报错 */ }
 
 function init() {
   renderThemeFilter();
