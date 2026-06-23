@@ -15067,8 +15067,9 @@
     "first_occasion": "会见美国康宁公司董事会主席",
     "first_title": "",
     "first_url": "https://www.shanghai.gov.cn/nw4411/20260326/55d7a6dcf72e41efbbcc5340fb7fb68f.html",
-    "count": 1,
+    "count": 2,
     "themes": [
+      "开放发展",
       "科技产业"
     ]
   },
@@ -15873,7 +15874,7 @@
     "first_occasion": "会见旧金山市市长并签署合作备忘录",
     "first_title": "",
     "first_url": "https://www.shanghai.gov.cn/nw4411/20260421/d9b6f601bb724999940293c34bc595f8.html",
-    "count": 1,
+    "count": 2,
     "themes": [
       "开放发展"
     ]
@@ -18426,6 +18427,97 @@
     "count": 1,
     "themes": [
       "科技产业"
+    ]
+  },
+  {
+    "phrase": "保持战略定力和行动敏捷",
+    "first_date": "2026-06-23",
+    "first_role": "市委书记",
+    "first_theme": "科技产业",
+    "first_occasion": "陈吉宁调研市科委并召开专题会",
+    "first_title": "",
+    "first_url": "https://view.inews.qq.com/a/20260623A0A87800",
+    "count": 1,
+    "themes": [
+      "科技产业"
+    ]
+  },
+  {
+    "phrase": "建立选题为基础的选人机制",
+    "first_date": "2026-06-23",
+    "first_role": "市委书记",
+    "first_theme": "科技产业",
+    "first_occasion": "陈吉宁调研市科委并召开专题会",
+    "first_title": "",
+    "first_url": "https://view.inews.qq.com/a/20260623A0A87800",
+    "count": 1,
+    "themes": [
+      "科技产业"
+    ]
+  },
+  {
+    "phrase": "项目经理人制度统筹创新全过程",
+    "first_date": "2026-06-23",
+    "first_role": "市委书记",
+    "first_theme": "科技产业",
+    "first_occasion": "陈吉宁调研市科委并召开专题会",
+    "first_title": "",
+    "first_url": "https://view.inews.qq.com/a/20260623A0A87800",
+    "count": 1,
+    "themes": [
+      "科技产业"
+    ]
+  },
+  {
+    "phrase": "数智化绿色化转型和消费结构变化调整步伐进一步加快",
+    "first_date": "2026-06-23",
+    "first_role": "市委书记",
+    "first_theme": "开放发展",
+    "first_occasion": "会见法国赛诺菲集团和英国汇丰集团负责人",
+    "first_title": "",
+    "first_url": "https://view.inews.qq.com/a/20260623A093AH00",
+    "count": 1,
+    "themes": [
+      "开放发展"
+    ]
+  },
+  {
+    "phrase": "为上海加快构建与国际金融中心开放创新相适应的监管体系提供真知灼见",
+    "first_date": "2026-06-23",
+    "first_role": "市委书记",
+    "first_theme": "开放发展",
+    "first_occasion": "会见法国赛诺菲集团和英国汇丰集团负责人",
+    "first_title": "",
+    "first_url": "https://view.inews.qq.com/a/20260623A093AH00",
+    "count": 1,
+    "themes": [
+      "开放发展"
+    ]
+  },
+  {
+    "phrase": "共享发展机遇",
+    "first_date": "2026-06-23",
+    "first_role": "市长",
+    "first_theme": "开放发展",
+    "first_occasion": "会见奥地利外长迈因尔-赖辛格",
+    "first_title": "",
+    "first_url": "https://view.inews.qq.com/a/20260623A09G4W00",
+    "count": 1,
+    "themes": [
+      "开放发展"
+    ]
+  },
+  {
+    "phrase": "推动更多技术成果在上海率先落地",
+    "first_date": "2026-06-23",
+    "first_role": "市长",
+    "first_theme": "开放发展",
+    "first_occasion": "龚正市长会见两家外资企业负责人",
+    "first_title": "",
+    "first_url": "https://view.inews.qq.com/a/20260623A09G4L00",
+    "count": 1,
+    "themes": [
+      "开放发展"
     ]
   }
 ]
