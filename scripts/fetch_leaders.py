@@ -89,7 +89,10 @@ HEADERS = {
 }
 
 API_URL = "https://api.deepseek.com/v1/chat/completions"
-API_KEY = os.environ.get("DEEPSEEK_API_KEY", "REDACTED_DEEPSEEK_API_KEY")
+API_KEY = os.environ.get("DEEPSEEK_API_KEY")
+if not API_KEY:
+    print("ERROR: DEEPSEEK_API_KEY is required", file=sys.stderr)
+    sys.exit(1)
 MODEL = "deepseek-v4-flash"
 
 SYSTEM_PROMPT = """你是民盟市委参政议政研究助理。任务：阅读市委书记或市长的一次公开讲话/活动报道全文，做结构化入库分析，输出 JSON。

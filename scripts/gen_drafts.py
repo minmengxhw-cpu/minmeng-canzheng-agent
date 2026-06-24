@@ -28,7 +28,10 @@ CUTS_PATH = ROOT / "data" / "cuts.json"
 DRAFTS_PATH = ROOT / "data" / "drafts.json"
 LEADERS_PATH = ROOT / "data" / "leaders.json"
 
-API_KEY = os.environ.get("DEEPSEEK_API_KEY", "REDACTED_DEEPSEEK_API_KEY")
+API_KEY = os.environ.get("DEEPSEEK_API_KEY")
+if not API_KEY:
+    print("ERROR: DEEPSEEK_API_KEY is required", file=sys.stderr)
+    sys.exit(1)
 API_URL = "https://api.deepseek.com/v1/chat/completions"
 MODEL = "deepseek-v4-flash"
 
