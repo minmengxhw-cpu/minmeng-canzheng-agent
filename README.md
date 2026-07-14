@@ -33,7 +33,7 @@ python3 scripts/update_all.py
 bash scripts/install_launchd.sh
 ```
 
-定时任务每天 07:30、19:30 抓取最近 6 页并最多生成 3 个新初稿；如果只更新信号、简报和候选切口，可运行：
+定时任务每天 09:00 抓取最近 6 页，使用 MiniMax CLI 完成领导动向分析，并刷新简报和候选切口；初稿单独增量运行。如果只更新信号、简报和候选切口，可运行：
 
 ```bash
 python3 scripts/update_all.py --skip-drafts

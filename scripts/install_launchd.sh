@@ -17,11 +17,11 @@ data = {
     "ProgramArguments": [
         str(root / "scripts" / "update_all.py"),
         "--max-pages", "6",
-        "--draft-limit", "3",
+        "--skip-drafts",
     ],
     "WorkingDirectory": str(root),
     "EnvironmentVariables": {"PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"},
-    "StartCalendarInterval": [{"Hour": 7, "Minute": 30}, {"Hour": 19, "Minute": 30}],
+    "StartCalendarInterval": [{"Hour": 9, "Minute": 0}],
     "StandardOutPath": str(log_dir / "launchd.out.log"),
     "StandardErrorPath": str(log_dir / "launchd.err.log"),
 }
@@ -31,4 +31,4 @@ PY
 
 launchctl bootout "gui/$(id -u)" "$PLIST" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
-echo "已安装：每天 07:30 和 19:30 自动更新（最近 6 页，最多 3 个初稿）"
+echo "已安装：每天 09:00 自动更新（最近 6 页，含 MiniMax 领导分析；初稿单独运行）"

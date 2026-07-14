@@ -91,10 +91,10 @@ python3 scripts/update_all.py --draft-limit 3
 python3 scripts/update_all.py --skip-drafts
 ```
 
-macOS 可安装每天 07:30、19:30 的定时任务：
+macOS 可安装每天 09:00 的定时任务：
 
 ```bash
 bash scripts/install_launchd.sh
 ```
 
-定时任务会抓取最近 6 页并最多生成 3 个新初稿；如果只想更新信号、简报和候选切口，可手动加 `--skip-drafts`。
+定时任务会抓取最近 6 页并用 MiniMax CLI 完成领导动向分析；为保证 09:00 主更新稳定，初稿不阻塞主任务。需要初稿时可手动运行 `python3 scripts/update_all.py --draft-limit 3`。
