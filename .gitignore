@@ -5,4 +5,5 @@ output/
 .env
 .env.*
 data/fetch_leaders.log
+data/logs/
 __pycache__/

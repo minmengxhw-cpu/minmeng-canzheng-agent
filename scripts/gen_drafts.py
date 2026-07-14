@@ -23,17 +23,12 @@ import time
 import urllib.request
 from pathlib import Path
 
+from minimax_cli import minimax_json
+
 ROOT = Path(__file__).resolve().parent.parent
 CUTS_PATH = ROOT / "data" / "cuts.json"
 DRAFTS_PATH = ROOT / "data" / "drafts.json"
 LEADERS_PATH = ROOT / "data" / "leaders.json"
-
-API_KEY = os.environ.get("DEEPSEEK_API_KEY")
-if not API_KEY:
-    print("ERROR: DEEPSEEK_API_KEY is required", file=sys.stderr)
-    sys.exit(1)
-API_URL = "https://api.deepseek.com/v1/chat/completions"
-MODEL = "deepseek-v4-flash"
 
 REGEN_ALL = os.environ.get("REGEN_ALL", "0") == "1"
 LIMIT = int(os.environ.get("LIMIT", "0"))  # 0 = 不限
@@ -147,30 +142,7 @@ def build_user_prompt(cut: dict, draft_type: str, related_excerpts: list) -> str
 
 def llm_call(system: str, user: str, max_tokens: int = 1800) -> dict:
     """调一次 LLM，返回 JSON"""
-    body = {
-        "model": MODEL,
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-        "temperature": 0.4,
-        "max_tokens": max_tokens,
-        "response_format": {"type": "json_object"},
-        "thinking": {"type": "disabled"},
-    }
-    req = urllib.request.Request(
-        API_URL,
-        data=json.dumps(body).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {API_KEY}",
-            "Content-Type": "application/json",
-        },
-    )
-    with urllib.request.urlopen(req, timeout=120) as r:
-        raw = r.read()
-    data = json.loads(raw)
-    content = data["choices"][0]["message"]["content"]
-    return json.loads(content)
+    return minimax_json(system, user, max_tokens=max_tokens, temperature=0.4)
 
 
 def main():

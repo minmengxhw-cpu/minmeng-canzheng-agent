@@ -7,7 +7,8 @@
 ### 安装
 
 ```bash
-pip3 install requests beautifulsoup4 python-dateutil
+pip3 install requests beautifulsoup4
+mmx auth login
 ```
 
 ### 运行
@@ -20,7 +21,7 @@ python3 scripts/fetch_leaders.py
 
 ### 定时（建议）
 
-每 6 小时跑一次：
+旧版每 6 小时跑一次的示例：
 
 ```cron
 0 */6 * * * cd /path/to/minmeng-canzheng-agent && python3 scripts/fetch_leaders.py >> /tmp/fetch_leaders.log 2>&1
@@ -79,3 +80,21 @@ async function loadLeaders() {
 - 仅采集公开发布内容，不做线索投稿
 - 每条引用保留原始链接与发布日期，可追溯
 - `change_note` 字段当前为占位（"待补充：……"），后续可接入辅助理解模型自动生成
+
+## 自动更新
+
+现在由 MiniMax CLI 负责抓取结果分析和三档初稿生成：
+
+```bash
+mmx auth login
+python3 scripts/update_all.py --draft-limit 3
+python3 scripts/update_all.py --skip-drafts
+```
+
+macOS 可安装每天 07:30、19:30 的定时任务：
+
+```bash
+bash scripts/install_launchd.sh
+```
+
+定时任务会抓取最近 6 页并最多生成 3 个新初稿；如果只想更新信号、简报和候选切口，可手动加 `--skip-drafts`。

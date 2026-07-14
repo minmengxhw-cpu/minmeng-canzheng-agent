@@ -22,3 +22,19 @@ python3 -m http.server 8765
 ## 数据更新
 
 每日定时抓取公开权威资料，自动完成「抓取 → 分析 → 切口重算 → 发布」流水线，所有数据均保留原始链接、发布日期与抓取时间。
+
+## 自动更新
+
+自动更新使用本机 MiniMax CLI 做领导动向分析和切口初稿生成：
+
+```bash
+mmx auth login
+python3 scripts/update_all.py
+bash scripts/install_launchd.sh
+```
+
+定时任务每天 07:30、19:30 抓取最近 6 页并最多生成 3 个新初稿；如果只更新信号、简报和候选切口，可运行：
+
+```bash
+python3 scripts/update_all.py --skip-drafts
+```

@@ -25,11 +25,12 @@
   python3 scripts/fetch_leaders.py                  # 默认回溯最近 180 天
   SINCE=2026-01-01 MAX_PAGES=120 python3 scripts/fetch_leaders.py   # 指定回溯
   ONLY_SECRETARY=1 python3 scripts/fetch_leaders.py # 只抓市委书记
-  DEEPSEEK_API_KEY=sk-xxx ...
+  mmx auth login
 """
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import re
 import sys
@@ -46,6 +47,8 @@ try:
 except ImportError:
     print("缺依赖：pip install requests beautifulsoup4", file=sys.stderr)
     sys.exit(1)
+
+from minimax_cli import minimax_json
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "data" / "leaders.json"
@@ -72,12 +75,25 @@ GUEST_SUID = os.environ.get("SH_GUEST_SUID", "8QMd3H1b7oIVvz7b")
 LIST_API = "https://i.news.qq.com/getSubNewsMixedList"
 DETAIL_RAIN = "https://news.qq.com/rain/a/"   # + <articleId>
 SOURCE_NAME = "上观新闻"
+OFFICIAL_SOURCE_NAME = "上海市人民政府"
+OFFICIAL_SEARCH_API = "https://search.sh.gov.cn/searchResult"
+OFFICIAL_SEARCH_FORM = {
+    "pageSize": "20", "resourceType": "", "channel": "",
+    "category1": "", "category2": "", "category3": "", "category4": "",
+    "category6": "", "category7": "", "sortMode": "", "searchMode": "",
+    "timeRange": "", "accurateMode": "", "district": "", "street": "",
+    "stealthy": "0", "showItemAgency": "false",
+}
+_OFFICIAL_SESSION = requests.Session()
+_OFFICIAL_SESSION_READY = False
 
 # 领导活动动词门控：标题未署名时，只有命中这些词才下钻详情页
 ACTIVITY_VERBS = [
     "主持", "出席", "调研", "会见", "座谈", "推进会", "动员", "部署",
     "考察", "督查", "检查", "慰问", "讲话", "会议", "强调", "指出",
     "走访", "现场办公", "接待", "看望", "宣讲", "专题", "工作要求",
+    "传达", "研究", "审议", "听取", "审定", "签署", "举行", "参加",
+    "发布", "通过", "批示", "专题会", "工作会", "现场会", "推进",
 ]
 
 HEADERS = {
@@ -87,13 +103,6 @@ HEADERS = {
     "Accept": "text/html,application/xhtml+xml",
     "Accept-Language": "zh-CN,zh;q=0.9",
 }
-
-API_URL = "https://api.deepseek.com/v1/chat/completions"
-API_KEY = os.environ.get("DEEPSEEK_API_KEY")
-if not API_KEY:
-    print("ERROR: DEEPSEEK_API_KEY is required", file=sys.stderr)
-    sys.exit(1)
-MODEL = "deepseek-v4-flash"
 
 SYSTEM_PROMPT = """你是民盟市委参政议政研究助理。任务：阅读市委书记或市长的一次公开讲话/活动报道全文，做结构化入库分析，输出 JSON。
 
@@ -201,6 +210,52 @@ def parse_list(data: Dict) -> List[Dict]:
     return out
 
 
+def fetch_official_search_page(keyword: str, page_no: int) -> List[Dict]:
+    """从上海市政府公开搜索结果读取上海要闻标题、日期、摘要和原文链接。"""
+    form = dict(OFFICIAL_SEARCH_FORM)
+    form.update({"text": keyword, "pageNo": str(page_no), "newsPageNo": str(page_no)})
+    global _OFFICIAL_SESSION_READY
+    try:
+        if not _OFFICIAL_SESSION_READY:
+            _OFFICIAL_SESSION.post(
+                "https://search.sh.gov.cn/search", data={"text": keyword},
+                headers=HEADERS, timeout=30,
+            )
+            _OFFICIAL_SESSION_READY = True
+        r = _OFFICIAL_SESSION.post(
+            OFFICIAL_SEARCH_API, data=form,
+            headers={**HEADERS, "Referer": "https://www.shanghai.gov.cn/"},
+            timeout=30,
+        )
+        r.raise_for_status()
+        soup = BeautifulSoup(r.text, "html.parser")
+    except Exception as e:
+        log(f"    ✗ 上海市政府搜索失败（{keyword} 第{page_no}页）: {e}")
+        return []
+
+    out = []
+    for item in soup.select("div.result.result-elm"):
+        title_el = item.select_one("a.restitle")
+        url_el = item.select_one("a.url")
+        if not title_el or not url_el:
+            continue
+        title = re.sub(r"\s+", " ", title_el.get_text(" ", strip=True)).strip()
+        url = (url_el.get("href") or "").strip()
+        if url.startswith("http://"):
+            url = "https://" + url[7:]
+        content = item.select_one(".content")
+        abstract = re.sub(r"\s+", " ", content.get_text(" ", strip=True)) if content else ""
+        m = re.search(r"(20\d{2}-\d{2}-\d{2})", abstract)
+        if not m or not url or not title:
+            continue
+        out.append({
+            "date": m.group(1), "headline": title[:160],
+            "id": "official-" + hashlib.sha1(url.encode("utf-8")).hexdigest()[:20],
+            "url": url, "abstract": abstract, "source": OFFICIAL_SOURCE_NAME,
+        })
+    return out
+
+
 def title_named_leader(title: str) -> Optional[str]:
     for name in LEADERS:
         if name in title:
@@ -247,6 +302,19 @@ def fetch_detail(article_id: str) -> str:
     return ""
 
 
+def fetch_official_detail(url: str) -> str:
+    """读取上海市政府官网文章正文。"""
+    try:
+        r = requests.get(url, headers=HEADERS, timeout=30)
+        r.raise_for_status()
+        soup = BeautifulSoup(r.text, "html.parser")
+        el = soup.select_one("#ivs_content") or soup.select_one(".Article_content")
+        return re.sub(r"\s+", " ", el.get_text(" ", strip=True)) if el else ""
+    except Exception as e:
+        log(f"    ✗ 官网正文失败: {e}")
+        return ""
+
+
 def analyze(headline: str, date: str, leader: str, full_text: str) -> Dict:
     if not full_text or len(full_text) < 80:
         return {}
@@ -268,25 +336,9 @@ def analyze(headline: str, date: str, leader: str, full_text: str) -> Dict:
   "keywords": ["关键词 1-5 个"],
   "policy_implications": "民盟参政议政切口建议，1-2 句，60-100 字"
 }}"""
-    body = {
-        "model": MODEL,
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user},
-        ],
-        "temperature": 0.2,
-        "max_tokens": 1200,
-        "response_format": {"type": "json_object"},
-        "thinking": {"type": "disabled"},
-    }
     for attempt in range(2):
         try:
-            req = urllib.request.Request(
-                API_URL, data=json.dumps(body).encode("utf-8"),
-                headers={"Authorization": f"Bearer {API_KEY}",
-                         "Content-Type": "application/json"})
-            r = urllib.request.urlopen(req, timeout=120).read()
-            return json.loads(json.loads(r)["choices"][0]["message"]["content"])
+            return minimax_json(SYSTEM_PROMPT, user, max_tokens=1200, temperature=0.2)
         except Exception as e:
             if attempt == 1:
                 log(f"    ✗ 分析失败: {e}")
@@ -336,9 +388,20 @@ def main() -> int:
     results: List[Dict] = list(history)  # 以历史为基底，增量补充
     results_urls = set(history_urls)
 
-    # 1. 翻页收集候选（offsetInfo 游标翻页）
+    # 1. 先抓上海市政府官网（官方源），再用腾讯混合流补充
     candidates: List[Dict] = []
     seen = set()
+    for keyword in LEADERS:
+        for page in range(1, min(MAX_PAGES, 6) + 1):
+            for item in fetch_official_search_page(keyword, page):
+                if item["date"] >= since and item["url"] not in seen:
+                    candidates.append(item)
+                    seen.add(item["url"])
+            if candidates and all(x["date"] < since for x in candidates[-20:]):
+                break
+    log(f"  上海市政府官网收集 {sum(1 for c in candidates if c.get('source') == OFFICIAL_SOURCE_NAME)} 条")
+
+    # 腾讯混合流翻页收集补充候选（offsetInfo 游标翻页）
     offset = ""
     for page in range(1, MAX_PAGES + 1):
         data = fetch_list_page(offset)
@@ -352,9 +415,9 @@ def main() -> int:
         page_min = min(it["date"] for it in items)
         new_n = 0
         for it in items:
-            if it["id"] in seen:
+            if it["url"] in seen:
                 continue
-            seen.add(it["id"])
+            seen.add(it["url"])
             if it["date"] < since:
                 continue  # 早于截止日期，丢弃（但继续看本页其余）
             candidates.append(it)
@@ -380,7 +443,7 @@ def main() -> int:
             skip_norel += 1
             continue  # 标题/摘要既未署名也非领导活动 → 不下钻
 
-        full = fetch_detail(c["id"])
+        full = fetch_official_detail(c["url"]) if c.get("source") == OFFICIAL_SOURCE_NAME else fetch_detail(c["id"])
         if not full:
             continue
         leader = detail_has_leader(full)
@@ -403,7 +466,7 @@ def main() -> int:
             "subthemes": analysis.get("subthemes", []),
             "keywords": analysis.get("keywords", []),
             "policy_implications": analysis.get("policy_implications", ""),
-            "source": SOURCE_NAME, "url": c["url"],
+            "source": c.get("source", SOURCE_NAME), "url": c["url"],
         }
         entry.update(detect_change(entry, results))
         results.append(entry)

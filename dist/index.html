@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#FAFAF7" />
+    <title>CZ Agent</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="#">
+          <span class="brand-text">CZ Agent</span>
+        </a>
+        <nav class="topbar-nav" aria-label="主导航">
+          <a href="#leaders">今日动向</a>
+          <a href="#cuts">候选切口</a>
+          <a href="#insight">提法洞察</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <!-- ========== ① 今日动向：领导主要活动（最高优先） ========== -->
+      <section class="leaders" id="leaders">
+        <div class="focus-head">
+          <p class="eyebrow" id="leadersEyebrow">市委关注 · 最高优先</p>
+          <h1>市委主要领导讲话与表述变化</h1>
+        </div>
+
+        <!-- 一打开第一眼：本周领导主要活动 Top3（点击直达下方时间轴） -->
+        <div class="focus-strip">
+          <p class="focus-strip-head" id="focusEyebrow">本周领导主要活动</p>
+          <div class="focus-grid" id="focusGrid" aria-live="polite"></div>
+        </div>
+
+        <!-- 筛选栏 -->
+        <div class="leader-filters" id="leaderFilters">
+          <div class="filter-row" id="leaderRoleFilter" role="tablist" aria-label="领导筛选"></div>
+          <div class="filter-row" id="leaderThemeFilter" role="tablist" aria-label="主题筛选"></div>
+          <div class="filter-search">
+            <input id="leaderSearch" type="search" class="input" placeholder="搜索：场合、新提法、关键词…" />
+            <span class="filter-stat" id="leaderStat"></span>
+          </div>
+        </div>
+
+        <!-- 主体（时间轴）+ 侧栏（近期新提法） -->
+        <div class="leader-layout">
+          <div class="leader-main">
+            <div class="leader-timeline" id="leaderTimeline" aria-live="polite"></div>
+          </div>
+          <aside class="leader-aside">
+            <div id="leaderPhraseCloud"></div>
+          </aside>
+        </div>
+
+        <!-- 月度趋势图：默认折叠，需要时展开 -->
+        <details class="leader-trend-wrap" id="leaderTrendWrap">
+          <summary class="leader-trend-summary">
+            <span class="trend-chev">▸</span>
+            <span class="trend-title">17 个月主题趋势</span>
+            <span class="trend-sub">点开查看月度分布堆叠柱图</span>
+          </summary>
+          <div id="leaderTrend"></div>
+        </details>
+      </section>
+
+      <!-- ========== ② 候选切口（核心产出） ========== -->
+      <section class="block" id="cuts">
+        <div class="block-head">
+          <div>
+            <p class="eyebrow">候选切口</p>
+            <h2>切口孵化库</h2>
+            <p class="lede">围绕市委关切的议题拆到机制层，每个切口附核验路径，可标台账、可导出。</p>
+          </div>
+          <div class="block-tools">
+            <label class="sr-only" for="themeFilter">专题筛选</label>
+            <select id="themeFilter" class="select">
+              <option value="all">全部专题</option>
+            </select>
+            <label class="sr-only" for="cutSearch">搜索切口</label>
+            <input id="cutSearch" type="search" class="input" placeholder="搜索：企业出海、长护险、入境消费…" />
+          </div>
+        </div>
+        <div class="ledger-filter" id="ledgerFilter"></div>
+        <div class="cut-grid" id="cutGrid"></div>
+      </section>
+
+      <!-- ========== ③ 提法洞察（流变 + 生命周期，标签切换） ========== -->
+      <section class="block" id="insight">
+        <div class="block-head">
+          <div>
+            <p class="eyebrow">提法洞察</p>
+            <h2>提法怎样演变、是否立住</h2>
+          </div>
+          <div class="block-tools tabs" id="insightTabs" role="tablist" aria-label="提法洞察视图">
+            <button class="tab active" type="button" data-ins="evolve" role="tab" aria-selected="true">提法流变</button>
+            <button class="tab" type="button" data-ins="life" role="tab" aria-selected="false">生命周期</button>
+          </div>
+        </div>
+
+        <!-- 视图 A：提法流变（同主题历次表述演变） -->
+        <div class="insight-pane" id="insEvolve">
+          <div class="ins-subhead">
+            <p class="ins-desc">把同一主题的历次公开表述按时间串联，看新提法怎样加入话语体系。每条可点原文追溯。</p>
+            <span class="scope-tag" id="evolveStat"></span>
+          </div>
+          <div class="evolve-recent" id="evolveRecent"></div>
+          <div class="evolve-controls">
+            <div class="filter-row evolve-themes" id="evolveThemes" role="tablist" aria-label="主题筛选"></div>
+            <button type="button" class="evo-toggle" id="evolveOnlyNew" aria-pressed="false">只看有新增</button>
+          </div>
+          <div class="evolve-body" id="evolveBody" aria-live="polite"></div>
+        </div>
+
+        <!-- 视图 B：提法生命周期（首现 → 立住 / 沉寂） -->
+        <div class="insight-pane" id="insLife" hidden>
+          <div class="ins-subhead">
+            <p class="ins-desc">看一个提法首现后是反复进入话语体系，还是出现一次就消失；曾高频却长期不再提的，是值得警觉的"退场信号"。</p>
+            <span class="scope-tag" id="lifeStat"></span>
+          </div>
+          <div class="filter-row life-filter" id="lifeFilter" role="tablist" aria-label="生命周期筛选"></div>
+          <div class="life-body" id="lifeBody" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <!-- 成果工作台（暂不显示前台，保留代码后续启用） -->
+      <section class="block workbench" id="workbench" hidden>
+        <div class="block-head">
+          <div>
+            <p class="eyebrow">成果工作台</p>
+            <h2 id="workbenchTitle">成果转化</h2>
+            <p class="lede">先想清楚"派什么用场"，再选成果载体。每档成果都从一句判断式标题开始。</p>
+          </div>
+          <div class="block-tools tabs" id="outputTabs" role="tablist" aria-label="成果类型">
+            <button class="tab active" type="button" data-output="brief">社情民意</button>
+            <button class="tab" type="button" data-output="proposal">提案建议</button>
+            <button class="tab" type="button" data-output="research">参政议政课题</button>
+          </div>
+        </div>
+        <div class="workbench-grid">
+          <article class="card pane" id="activeCut"></article>
+          <article class="card pane pane-draft" id="draftPanel"></article>
+        </div>
+      </section>
+
+      <footer class="page-footer">
+        <div class="footer-inner">
+          <p class="footer-brand">CZ Agent</p>
+          <p class="footer-meta">
+            <span id="metaSignals"></span>
+            <span class="dot">·</span>
+            <span id="metaTopics"></span>
+          </p>
+          <p class="footer-note">每日 07:30 + 19:30 自动更新 · 输出仅供参政议政起草参考，需人工核验</p>
+        </div>
+      </footer>
+    </main>
+
+    <nav class="mobile-nav" aria-label="移动端导航">
+      <a href="#leaders" class="m-nav-item">
+        <span class="m-icon" aria-hidden="true">⌂</span>
+        <span>动向</span>
+      </a>
+      <a href="#cuts" class="m-nav-item">
+        <span class="m-icon" aria-hidden="true">◇</span>
+        <span>切口</span>
+      </a>
+      <a href="#insight" class="m-nav-item">
+        <span class="m-icon" aria-hidden="true">⇌</span>
+        <span>提法</span>
+      </a>
+    </nav>
+
+    <script src="src/data.js"></script>
+    <script src="src/app.js"></script>
+  </body>
+</html>
