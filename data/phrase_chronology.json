@@ -1608,7 +1608,7 @@
     "first_occasion": "上海代表团小组会议审议全国人大常委会工作报告",
     "first_title": "",
     "first_url": "https://www.shanghai.gov.cn/nw4411/20250309/97bd68fad1c547dbb63a70860bfc8c4c.html",
-    "count": 4,
+    "count": 5,
     "themes": [
       "城市治理",
       "开放发展"
@@ -4371,7 +4371,7 @@
     "first_occasion": "市委常委会会议",
     "first_title": "",
     "first_url": "https://www.shanghai.gov.cn/nw4411/20250524/9184f5e9cb9842e59ec44be2202bb658.html",
-    "count": 1,
+    "count": 2,
     "themes": [
       "城市治理"
     ]
@@ -12087,7 +12087,7 @@
     "first_occasion": "市委科技委会议",
     "first_title": "",
     "first_url": "https://www.shanghai.gov.cn/nw4411/20260107/1182acc310374bdead253b3787499c73.html",
-    "count": 1,
+    "count": 2,
     "themes": [
       "科技产业"
     ]
@@ -13777,7 +13777,7 @@
     "first_occasion": "春节后首个工作日松江区调研座谈会",
     "first_title": "",
     "first_url": "https://www.shanghai.gov.cn/nw4411/20260225/d39c1bdc1aa342238ce77d08c8edcee5.html",
-    "count": 2,
+    "count": 3,
     "themes": [
       "城市治理",
       "科技产业"
@@ -17689,6 +17689,71 @@
     ]
   },
   {
+    "phrase": "排水厂站网一体化调度能力（在演练中整体提升）",
+    "first_date": "2026-06-05",
+    "first_role": "市委书记",
+    "first_theme": "城市治理",
+    "first_occasion": "汛期防汛检查暨污水治理调研",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260605/9fb82c63cc8f4201a913a9f37462ce4a.html",
+    "count": 1,
+    "themes": [
+      "城市治理"
+    ]
+  },
+  {
+    "phrase": "地下风险、地上风险、头顶风险、看不见的风险（四类风险分类）",
+    "first_date": "2026-06-05",
+    "first_role": "市委书记",
+    "first_theme": "城市治理",
+    "first_occasion": "汛期防汛检查暨污水治理调研",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260605/9fb82c63cc8f4201a913a9f37462ce4a.html",
+    "count": 1,
+    "themes": [
+      "城市治理"
+    ]
+  },
+  {
+    "phrase": "人防、技防、工程防、管理防（四防措施体系）",
+    "first_date": "2026-06-05",
+    "first_role": "市委书记",
+    "first_theme": "城市治理",
+    "first_occasion": "汛期防汛检查暨污水治理调研",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260605/9fb82c63cc8f4201a913a9f37462ce4a.html",
+    "count": 1,
+    "themes": [
+      "城市治理"
+    ]
+  },
+  {
+    "phrase": "新增点位变量影响（关注风险动态变化）",
+    "first_date": "2026-06-05",
+    "first_role": "市委书记",
+    "first_theme": "城市治理",
+    "first_occasion": "汛期防汛检查暨污水治理调研",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260605/9fb82c63cc8f4201a913a9f37462ce4a.html",
+    "count": 1,
+    "themes": [
+      "城市治理"
+    ]
+  },
+  {
+    "phrase": "态势可知、问题可判、风险可控（三个可目标）",
+    "first_date": "2026-06-05",
+    "first_role": "市委书记",
+    "first_theme": "城市治理",
+    "first_occasion": "汛期防汛检查暨污水治理调研",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260605/9fb82c63cc8f4201a913a9f37462ce4a.html",
+    "count": 1,
+    "themes": [
+      "城市治理"
+    ]
+  },
+  {
     "phrase": "工业智能化转型开辟合作新领域、拓展发展新赛道",
     "first_date": "2026-06-08",
     "first_role": "市委书记",
@@ -18518,6 +18583,565 @@
     "count": 1,
     "themes": [
       "开放发展"
+    ]
+  },
+  {
+    "phrase": "打响上海定制品牌",
+    "first_date": "2026-06-30",
+    "first_role": "市长",
+    "first_theme": "开放发展",
+    "first_occasion": "龚正市长调研促消费工作",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260630/daef59b64b7f4b8ca0b694056ba97ac8.html",
+    "count": 1,
+    "themes": [
+      "开放发展"
+    ]
+  },
+  {
+    "phrase": "打造上海环球美食汇新IP",
+    "first_date": "2026-06-30",
+    "first_role": "市长",
+    "first_theme": "开放发展",
+    "first_occasion": "龚正市长调研促消费工作",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260630/daef59b64b7f4b8ca0b694056ba97ac8.html",
+    "count": 1,
+    "themes": [
+      "开放发展"
+    ]
+  },
+  {
+    "phrase": "创新的复合消费业态",
+    "first_date": "2026-06-30",
+    "first_role": "市长",
+    "first_theme": "开放发展",
+    "first_occasion": "龚正市长调研促消费工作",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260630/daef59b64b7f4b8ca0b694056ba97ac8.html",
+    "count": 1,
+    "themes": [
+      "开放发展"
+    ]
+  },
+  {
+    "phrase": "打造首发首店经济高地和休闲消费新地标",
+    "first_date": "2026-06-30",
+    "first_role": "市长",
+    "first_theme": "开放发展",
+    "first_occasion": "龚正市长调研促消费工作",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260630/daef59b64b7f4b8ca0b694056ba97ac8.html",
+    "count": 1,
+    "themes": [
+      "开放发展"
+    ]
+  },
+  {
+    "phrase": "放大文商旅体展融合效应",
+    "first_date": "2026-06-30",
+    "first_role": "市长",
+    "first_theme": "开放发展",
+    "first_occasion": "龚正市长调研促消费工作",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260630/daef59b64b7f4b8ca0b694056ba97ac8.html",
+    "count": 1,
+    "themes": [
+      "开放发展"
+    ]
+  },
+  {
+    "phrase": "专心致志当好“施工队长”",
+    "first_date": "2026-07-02",
+    "first_role": "市委书记",
+    "first_theme": "城市治理",
+    "first_occasion": "上海市“两优一先”表彰会议",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260702/983a1a0fc578440fb010442c9a4aaf75.html",
+    "count": 1,
+    "themes": [
+      "城市治理"
+    ]
+  },
+  {
+    "phrase": "加快培育发展壮大新质生产力",
+    "first_date": "2026-07-02",
+    "first_role": "市委书记",
+    "first_theme": "城市治理",
+    "first_occasion": "上海市“两优一先”表彰会议",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260702/983a1a0fc578440fb010442c9a4aaf75.html",
+    "count": 1,
+    "themes": [
+      "城市治理"
+    ]
+  },
+  {
+    "phrase": "基础研究先行区建设完善选人选题机制",
+    "first_date": "2026-07-03",
+    "first_role": "市委书记",
+    "first_theme": "科技产业",
+    "first_occasion": "上海市科学技术奖励大会",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260703/aafca4efbc79485197051550909cf12e.html",
+    "count": 1,
+    "themes": [
+      "科技产业"
+    ]
+  },
+  {
+    "phrase": "深化科学智能建设推动科研范式转型",
+    "first_date": "2026-07-03",
+    "first_role": "市委书记",
+    "first_theme": "科技产业",
+    "first_occasion": "上海市科学技术奖励大会",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260703/aafca4efbc79485197051550909cf12e.html",
+    "count": 1,
+    "themes": [
+      "科技产业"
+    ]
+  },
+  {
+    "phrase": "构建体系化规范化概念验证中心和中试检验检测体系",
+    "first_date": "2026-07-03",
+    "first_role": "市委书记",
+    "first_theme": "科技产业",
+    "first_occasion": "上海市科学技术奖励大会",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260703/aafca4efbc79485197051550909cf12e.html",
+    "count": 1,
+    "themes": [
+      "科技产业"
+    ]
+  },
+  {
+    "phrase": "科学家+创业者人才培养新模式",
+    "first_date": "2026-07-03",
+    "first_role": "市委书记",
+    "first_theme": "科技产业",
+    "first_occasion": "上海市科学技术奖励大会",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260703/aafca4efbc79485197051550909cf12e.html",
+    "count": 1,
+    "themes": [
+      "科技产业"
+    ]
+  },
+  {
+    "phrase": "经济向优向新态势（升级表述）",
+    "first_date": "2026-07-03",
+    "first_role": "市委书记",
+    "first_theme": "科技产业",
+    "first_occasion": "市委季度工作会议",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260703/395cf708ab7f4ca6a7d7d5db74d43e3f.html",
+    "count": 1,
+    "themes": [
+      "科技产业"
+    ]
+  },
+  {
+    "phrase": "新质服务商计划（产业培育新模式）",
+    "first_date": "2026-07-03",
+    "first_role": "市委书记",
+    "first_theme": "科技产业",
+    "first_occasion": "市委季度工作会议",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260703/395cf708ab7f4ca6a7d7d5db74d43e3f.html",
+    "count": 1,
+    "themes": [
+      "科技产业"
+    ]
+  },
+  {
+    "phrase": "选人+选题协同（基础研究机制创新）",
+    "first_date": "2026-07-03",
+    "first_role": "市委书记",
+    "first_theme": "科技产业",
+    "first_occasion": "市委季度工作会议",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260703/395cf708ab7f4ca6a7d7d5db74d43e3f.html",
+    "count": 1,
+    "themes": [
+      "科技产业"
+    ]
+  },
+  {
+    "phrase": "类案治理（从个案到共性治理的范式转变）",
+    "first_date": "2026-07-03",
+    "first_role": "市委书记",
+    "first_theme": "科技产业",
+    "first_occasion": "市委季度工作会议",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260703/395cf708ab7f4ca6a7d7d5db74d43e3f.html",
+    "count": 1,
+    "themes": [
+      "科技产业"
+    ]
+  },
+  {
+    "phrase": "离岸金融行动方案（开放发展新举措）",
+    "first_date": "2026-07-03",
+    "first_role": "市委书记",
+    "first_theme": "科技产业",
+    "first_occasion": "市委季度工作会议",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260703/395cf708ab7f4ca6a7d7d5db74d43e3f.html",
+    "count": 1,
+    "themes": [
+      "科技产业"
+    ]
+  },
+  {
+    "phrase": "服务包制度（企业服务机制）",
+    "first_date": "2026-07-03",
+    "first_role": "市委书记",
+    "first_theme": "科技产业",
+    "first_occasion": "市委季度工作会议",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260703/395cf708ab7f4ca6a7d7d5db74d43e3f.html",
+    "count": 1,
+    "themes": [
+      "科技产业"
+    ]
+  },
+  {
+    "phrase": "科学智能（AI for Science）作为引领性概念",
+    "first_date": "2026-07-07",
+    "first_role": "市委书记",
+    "first_theme": "科技产业",
+    "first_occasion": "科学智能百团百项研讨会",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260707/8ba32e23914c493fa2e55909021ca128.html",
+    "count": 1,
+    "themes": [
+      "科技产业"
+    ]
+  },
+  {
+    "phrase": "百团百项工程：支持青年科学家面向科学探索和产业发展需求",
+    "first_date": "2026-07-07",
+    "first_role": "市委书记",
+    "first_theme": "科技产业",
+    "first_occasion": "科学智能百团百项研讨会",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260707/8ba32e23914c493fa2e55909021ca128.html",
+    "count": 1,
+    "themes": [
+      "科技产业"
+    ]
+  },
+  {
+    "phrase": "高风险、高价值的探索性研究",
+    "first_date": "2026-07-07",
+    "first_role": "市委书记",
+    "first_theme": "科技产业",
+    "first_occasion": "科学智能百团百项研讨会",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260707/8ba32e23914c493fa2e55909021ca128.html",
+    "count": 1,
+    "themes": [
+      "科技产业"
+    ]
+  },
+  {
+    "phrase": "科研范式变革和科研组织形式调整",
+    "first_date": "2026-07-07",
+    "first_role": "市委书记",
+    "first_theme": "科技产业",
+    "first_occasion": "科学智能百团百项研讨会",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260707/8ba32e23914c493fa2e55909021ca128.html",
+    "count": 1,
+    "themes": [
+      "科技产业"
+    ]
+  },
+  {
+    "phrase": "在算力、数据、人才、实验验证等方面加大支持力度",
+    "first_date": "2026-07-07",
+    "first_role": "市委书记",
+    "first_theme": "科技产业",
+    "first_occasion": "科学智能百团百项研讨会",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260707/8ba32e23914c493fa2e55909021ca128.html",
+    "count": 1,
+    "themes": [
+      "科技产业"
+    ]
+  },
+  {
+    "phrase": "法律监督的穿透性、服务管理的精准性",
+    "first_date": "2026-07-08",
+    "first_role": "市委书记",
+    "first_theme": "营商环境",
+    "first_occasion": "陈吉宁市人民检察院调研法治化营商环境",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260708/cd59c78862df497ba024d265f21128b3.html",
+    "count": 1,
+    "themes": [
+      "营商环境"
+    ]
+  },
+  {
+    "phrase": "信用惩戒与信用修复的衔接机制",
+    "first_date": "2026-07-08",
+    "first_role": "市委书记",
+    "first_theme": "营商环境",
+    "first_occasion": "陈吉宁市人民检察院调研法治化营商环境",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260708/cd59c78862df497ba024d265f21128b3.html",
+    "count": 1,
+    "themes": [
+      "营商环境"
+    ]
+  },
+  {
+    "phrase": "惠企政策落实的堵点、执行的卡点、企业的痛点",
+    "first_date": "2026-07-08",
+    "first_role": "市委书记",
+    "first_theme": "营商环境",
+    "first_occasion": "陈吉宁市人民检察院调研法治化营商环境",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260708/cd59c78862df497ba024d265f21128b3.html",
+    "count": 1,
+    "themes": [
+      "营商环境"
+    ]
+  },
+  {
+    "phrase": "从'个案'到'类案'的方法论",
+    "first_date": "2026-07-08",
+    "first_role": "市委书记",
+    "first_theme": "营商环境",
+    "first_occasion": "陈吉宁市人民检察院调研法治化营商环境",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260708/cd59c78862df497ba024d265f21128b3.html",
+    "count": 1,
+    "themes": [
+      "营商环境"
+    ]
+  },
+  {
+    "phrase": "行刑双向衔接",
+    "first_date": "2026-07-08",
+    "first_role": "市委书记",
+    "first_theme": "营商环境",
+    "first_occasion": "陈吉宁市人民检察院调研法治化营商环境",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260708/cd59c78862df497ba024d265f21128b3.html",
+    "count": 1,
+    "themes": [
+      "营商环境"
+    ]
+  },
+  {
+    "phrase": "当标杆、做示范、走前列（上海对口支援新定位）",
+    "first_date": "2026-07-10",
+    "first_role": "市长",
+    "first_theme": "开放发展",
+    "first_occasion": "上海市代表团赴西藏日喀则学习考察",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260710/03334e5795f14cfaa818eecef88d8aa6.html",
+    "count": 1,
+    "themes": [
+      "开放发展"
+    ]
+  },
+  {
+    "phrase": "海拔高境界更高（对西藏干部精神的新概括）",
+    "first_date": "2026-07-10",
+    "first_role": "市长",
+    "first_theme": "开放发展",
+    "first_occasion": "上海市代表团赴西藏日喀则学习考察",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260710/03334e5795f14cfaa818eecef88d8aa6.html",
+    "count": 1,
+    "themes": [
+      "开放发展"
+    ]
+  },
+  {
+    "phrase": "边境守护者建设者之家（上海援建的边境保障新模式）",
+    "first_date": "2026-07-10",
+    "first_role": "市长",
+    "first_theme": "开放发展",
+    "first_occasion": "上海市代表团赴西藏日喀则学习考察",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260710/03334e5795f14cfaa818eecef88d8aa6.html",
+    "count": 1,
+    "themes": [
+      "开放发展"
+    ]
+  },
+  {
+    "phrase": "珠峰·申情（沪藏电商合作品牌）",
+    "first_date": "2026-07-10",
+    "first_role": "市长",
+    "first_theme": "开放发展",
+    "first_occasion": "上海市代表团赴西藏日喀则学习考察",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260710/03334e5795f14cfaa818eecef88d8aa6.html",
+    "count": 1,
+    "themes": [
+      "开放发展"
+    ]
+  },
+  {
+    "phrase": "带不走的人才队伍（组团式帮扶目标表述）",
+    "first_date": "2026-07-10",
+    "first_role": "市长",
+    "first_theme": "开放发展",
+    "first_occasion": "上海市代表团赴西藏日喀则学习考察",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260710/03334e5795f14cfaa818eecef88d8aa6.html",
+    "count": 1,
+    "themes": [
+      "开放发展"
+    ]
+  },
+  {
+    "phrase": "排水厂站网一体化调度机制（跨层级跨主体协同新机制）",
+    "first_date": "2026-07-11",
+    "first_role": "市委书记",
+    "first_theme": "城市治理",
+    "first_occasion": "市防汛指挥部检查部署台风防御",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260711/13093e00fc2643bba9c9071b108f3a8e.html",
+    "count": 1,
+    "themes": [
+      "城市治理"
+    ]
+  },
+  {
+    "phrase": "气象大模型实战应用（新技术赋能预报预警）",
+    "first_date": "2026-07-11",
+    "first_role": "市委书记",
+    "first_theme": "城市治理",
+    "first_occasion": "市防汛指挥部检查部署台风防御",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260711/13093e00fc2643bba9c9071b108f3a8e.html",
+    "count": 1,
+    "themes": [
+      "城市治理"
+    ]
+  },
+  {
+    "phrase": "扁平化指挥体系（压缩层级提升响应效率）",
+    "first_date": "2026-07-11",
+    "first_role": "市委书记",
+    "first_theme": "城市治理",
+    "first_occasion": "市防汛指挥部检查部署台风防御",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260711/13093e00fc2643bba9c9071b108f3a8e.html",
+    "count": 1,
+    "themes": [
+      "城市治理"
+    ]
+  },
+  {
+    "phrase": "向前一步通力协作（打破行政边界主动担当）",
+    "first_date": "2026-07-11",
+    "first_role": "市委书记",
+    "first_theme": "城市治理",
+    "first_occasion": "市防汛指挥部检查部署台风防御",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260711/13093e00fc2643bba9c9071b108f3a8e.html",
+    "count": 1,
+    "themes": [
+      "城市治理"
+    ]
+  },
+  {
+    "phrase": "大宗商品流通数字信任体系（覆盖全链路的新概念）",
+    "first_date": "2026-07-11",
+    "first_role": "市委书记",
+    "first_theme": "开放发展",
+    "first_occasion": "沪深化央地协同发展新篇章",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260711/30271f1b336b43dbace79550a6642908.html",
+    "count": 1,
+    "themes": [
+      "开放发展"
+    ]
+  },
+  {
+    "phrase": "航贸引领（区别于传统物流定位的新表述）",
+    "first_date": "2026-07-11",
+    "first_role": "市委书记",
+    "first_theme": "开放发展",
+    "first_occasion": "沪深化央地协同发展新篇章",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260711/30271f1b336b43dbace79550a6642908.html",
+    "count": 1,
+    "themes": [
+      "开放发展"
+    ]
+  },
+  {
+    "phrase": "区块链基础设施接入数字物流平台（技术融合新模式）",
+    "first_date": "2026-07-11",
+    "first_role": "市委书记",
+    "first_theme": "开放发展",
+    "first_occasion": "沪深化央地协同发展新篇章",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260711/30271f1b336b43dbace79550a6642908.html",
+    "count": 1,
+    "themes": [
+      "开放发展"
+    ]
+  },
+  {
+    "phrase": "多式联运“一单制”（制度创新新路径）",
+    "first_date": "2026-07-11",
+    "first_role": "市委书记",
+    "first_theme": "开放发展",
+    "first_occasion": "沪深化央地协同发展新篇章",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260711/30271f1b336b43dbace79550a6642908.html",
+    "count": 1,
+    "themes": [
+      "开放发展"
+    ]
+  },
+  {
+    "phrase": "分层施教的特色宣讲方式",
+    "first_date": "2026-07-14",
+    "first_role": "市委书记",
+    "first_theme": "文化教育",
+    "first_occasion": "重阳节走访慰问银发志愿者",
+    "first_title": "",
+    "first_url": "https://view.inews.qq.com/a/20260714A02D7X00",
+    "count": 1,
+    "themes": [
+      "文化教育"
+    ]
+  },
+  {
+    "phrase": "银发余热坚守宣讲阵地",
+    "first_date": "2026-07-14",
+    "first_role": "市委书记",
+    "first_theme": "文化教育",
+    "first_occasion": "重阳节走访慰问银发志愿者",
+    "first_title": "",
+    "first_url": "https://view.inews.qq.com/a/20260714A02D7X00",
+    "count": 1,
+    "themes": [
+      "文化教育"
+    ]
+  },
+  {
+    "phrase": "神游天地读中华等四大资源库",
+    "first_date": "2026-07-14",
+    "first_role": "市委书记",
+    "first_theme": "文化教育",
+    "first_occasion": "重阳节走访慰问银发志愿者",
+    "first_title": "",
+    "first_url": "https://view.inews.qq.com/a/20260714A02D7X00",
+    "count": 1,
+    "themes": [
+      "文化教育"
     ]
   }
 ]
