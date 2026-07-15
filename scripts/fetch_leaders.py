@@ -25,7 +25,7 @@
   python3 scripts/fetch_leaders.py                  # 默认回溯最近 180 天
   SINCE=2026-01-01 MAX_PAGES=120 python3 scripts/fetch_leaders.py   # 指定回溯
   ONLY_SECRETARY=1 python3 scripts/fetch_leaders.py # 只抓市委书记
-  mmx auth login
+  grok login
 """
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ except ImportError:
     print("缺依赖：pip install requests beautifulsoup4", file=sys.stderr)
     sys.exit(1)
 
-from minimax_cli import minimax_json
+from grok_cli import grok_json
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "data" / "leaders.json"
@@ -338,7 +338,7 @@ def analyze(headline: str, date: str, leader: str, full_text: str) -> Dict:
 }}"""
     for attempt in range(2):
         try:
-            return minimax_json(SYSTEM_PROMPT, user, max_tokens=1200, temperature=0.2)
+            return grok_json(SYSTEM_PROMPT, user, max_tokens=1200, temperature=0.2)
         except Exception as e:
             if attempt == 1:
                 log(f"    ✗ 分析失败: {e}")

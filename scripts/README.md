@@ -8,7 +8,7 @@
 
 ```bash
 pip3 install requests beautifulsoup4
-mmx auth login
+grok login
 ```
 
 ### 运行
@@ -83,18 +83,18 @@ async function loadLeaders() {
 
 ## 自动更新
 
-现在由 MiniMax CLI 负责抓取结果分析和三档初稿生成：
+现在由 Grok CLI 负责抓取结果分析和三档初稿生成：
 
 ```bash
-mmx auth login
+grok login
 python3 scripts/update_all.py --draft-limit 3
 python3 scripts/update_all.py --skip-drafts
 ```
 
-macOS 可安装每天 09:00 的定时任务：
+macOS 可安装每天 09:00 和 21:00 的定时任务：
 
 ```bash
 bash scripts/install_launchd.sh
 ```
 
-定时任务会抓取最近 6 页并用 MiniMax CLI 完成领导动向分析；为保证 09:00 主更新稳定，初稿不阻塞主任务。需要初稿时可手动运行 `python3 scripts/update_all.py --draft-limit 3`。
+定时任务会抓取最近 6 页并用 Grok CLI 完成领导动向分析；为保证主更新稳定，初稿不阻塞主任务。需要初稿时可手动运行 `python3 scripts/update_all.py --draft-limit 3`。
