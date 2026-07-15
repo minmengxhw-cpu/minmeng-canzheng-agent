@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""市委主要领导讲话/活动抓取 + 入库分析（数据源：上海发布）
+"""市委主要领导讲话/活动抓取 + 入库分析（数据源：上海市政府官网、上观新闻）
 
-2026-06 数据源切换：上海市政府门户网 nw4411 更新太慢，改抓腾讯新闻「上观新闻」
-（上报集团党媒号，日更多条，书记/市长调研会见时政覆盖快）。
-注：「上海发布」腾讯号实测为民生资讯号，300 条 0 领导，故弃用；改用上观新闻。
+同时抓取上海市政府官网和腾讯新闻「上观新闻」
+（上报集团党媒号，补充书记/市长调研会见等时政信息）。
 
 数据流：
   1. 列表接口 getSubNewsMixedList（JSON，offsetInfo 游标翻页，无需渲染）
@@ -19,7 +18,7 @@
   4. 辅助理解 → 摘要 + 关键论断 + 新提法 + 政策启示
   5. 与历史同主题对比 → 识别重点变化（持续提及 vs 新出现）
   6. 断点续抓：复用 data/leaders.json 已分析条目（按 url），增量写盘 + 进度日志
-     旧的政府网历史条目原样保留，新增条目来自上海发布。
+     旧条目原样保留，新增条目来自上海市政府官网和上观新闻。
 
 运行：
   python3 scripts/fetch_leaders.py                  # 默认回溯最近 180 天
@@ -68,8 +67,7 @@ SINCE = os.environ.get("SINCE", "")  # YYYY-MM-DD；空则取 今天-DEFAULT_DAY
 DEFAULT_DAYS = int(os.environ.get("DEFAULT_DAYS", "180"))
 MAX_PAGES = int(os.environ.get("MAX_PAGES", "60"))  # 一页=一次接口翻页(约20条)
 
-# 上观新闻（上报集团党媒号，时政覆盖强、日更多条，含书记/市长调研会见）
-# 实测优于政府网与「上海发布」民生号：后者 300 条 0 领导，上观 160 条命中 4 条署名
+# 上观新闻（上报集团党媒号，补充书记/市长调研会见等时政信息）
 # media_id=5004941，guestSuid 为列表接口所需的账号令牌
 GUEST_SUID = os.environ.get("SH_GUEST_SUID", "8QMd3H1b7oIVvz7b")
 LIST_API = "https://i.news.qq.com/getSubNewsMixedList"
@@ -166,7 +164,7 @@ def fetch(url: str, timeout: int = 25) -> Optional[str]:
 
 
 def fetch_list_page(offset_info: str) -> Optional[Dict]:
-    """拉一页上海发布列表（JSON）。offset_info 为上一页返回的游标，首页传空。"""
+    """拉一页上观新闻列表（JSON）。offset_info 为上一页返回的游标，首页传空。"""
     params = {
         "offset_info": offset_info or "",
         "guestSuid": GUEST_SUID,
@@ -374,7 +372,7 @@ def save(results: List[Dict]):
 def main() -> int:
     since = SINCE or (datetime.now() - timedelta(days=DEFAULT_DAYS)).strftime("%Y-%m-%d")
     log(f"\n=== 抓取市委领导讲话/活动 + 入库分析 ===")
-    log(f"  源：上海发布 · 回溯至 {since} · 最多 {MAX_PAGES} 翻页 · "
+    log(f"  源：上海市政府官网 + 上观新闻 · 回溯至 {since} · 最多 {MAX_PAGES} 翻页 · "
         f"领导 {list(LEADERS)} · ONLY_SECRETARY={ONLY_SECRETARY}")
 
     # 读历史（断点续抓）
@@ -388,7 +386,7 @@ def main() -> int:
     results: List[Dict] = list(history)  # 以历史为基底，增量补充
     results_urls = set(history_urls)
 
-    # 1. 先抓上海市政府官网（官方源），再用腾讯混合流补充
+    # 1. 先抓上海市政府官网（官方源），再用上观新闻补充
     candidates: List[Dict] = []
     seen = set()
     for keyword in LEADERS:
@@ -399,9 +397,10 @@ def main() -> int:
                     seen.add(item["url"])
             if candidates and all(x["date"] < since for x in candidates[-20:]):
                 break
-    log(f"  上海市政府官网收集 {sum(1 for c in candidates if c.get('source') == OFFICIAL_SOURCE_NAME)} 条")
+    official_count = sum(1 for c in candidates if c.get("source") == OFFICIAL_SOURCE_NAME)
+    log(f"  上海市政府官网收集 {official_count} 条")
 
-    # 腾讯混合流翻页收集补充候选（offsetInfo 游标翻页）
+    # 上观新闻混合流翻页收集补充候选（offsetInfo 游标翻页）
     offset = ""
     for page in range(1, MAX_PAGES + 1):
         data = fetch_list_page(offset)
@@ -428,6 +427,8 @@ def main() -> int:
             log(f"  · 到底 / 越过截止日期 {since}，停止翻页")
             break
 
+    guanzhi_count = len(candidates) - official_count
+    log(f"  上观新闻收集 {guanzhi_count} 条")
     log(f"\n共收集 {len(candidates)} 条候选（≥{since}）→ 两阶段过滤 + 入库分析")
 
     # 2 + 3 + 4. 过滤 + 分析

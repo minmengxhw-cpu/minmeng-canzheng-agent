@@ -4,4 +4,4 @@
 
 网站：<https://minmengxhw-cpu.github.io/minmeng-canzheng-agent/>
 
-数据每天北京时间 09:00 自动更新。
+数据每天北京时间 09:00 和 21:00 自动更新。

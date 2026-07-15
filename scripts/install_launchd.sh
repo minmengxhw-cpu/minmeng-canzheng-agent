@@ -19,7 +19,10 @@ data = {
     ],
     "WorkingDirectory": str(root),
     "EnvironmentVariables": {"PATH": "/Users/cheer/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"},
-    "StartCalendarInterval": [{"Hour": 9, "Minute": 0}],
+    "StartCalendarInterval": [
+        {"Hour": 9, "Minute": 0},
+        {"Hour": 21, "Minute": 0},
+    ],
     "StandardOutPath": str(log_dir / "launchd.out.log"),
     "StandardErrorPath": str(log_dir / "launchd.err.log"),
 }
@@ -29,4 +32,4 @@ PY
 
 launchctl bootout "gui/$(id -u)" "$PLIST" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
-echo "已安装：每天 09:00 自动更新并推送 GitHub（MiniMax CLI）"
+echo "已安装：每天 09:00 和 21:00 自动更新并推送 GitHub（MiniMax CLI）"
