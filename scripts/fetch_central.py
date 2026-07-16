@@ -110,12 +110,20 @@ def analyze(date: str, headline: str, full_text: str) -> Dict[str, Any]:
 
 def save(results: List[Dict[str, Any]]) -> None:
     results.sort(key=lambda x: x.get("date", ""), reverse=True)
-    OUT.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
-    latest = results[0] if results else {}
+    unique: List[Dict[str, Any]] = []
+    seen_keys = set()
+    for item in results:
+        key = (item.get("date", ""), item.get("headline", ""))
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        unique.append(item)
+    OUT.write_text(json.dumps(unique, ensure_ascii=False, indent=2), encoding="utf-8")
+    latest = unique[0] if unique else {}
     LATEST.write_text(json.dumps({
         "date": latest.get("date", ""),
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
-        "count": len(results),
+        "count": len(unique),
         "latest": latest,
     }, ensure_ascii=False, indent=2), encoding="utf-8")
 
