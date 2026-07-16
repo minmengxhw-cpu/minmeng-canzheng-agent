@@ -31,6 +31,7 @@ const state = {
   lifeFilter: "all",     // 提法生命周期筛选
   leaderSearch: "",
   leaderItems: [],       // 所有 leaders 信号缓存
+  centralItems: [],      // 独立中央行程信号缓存
   phraseCounts: {},      // phrase -> 累计反复次数（来自 chronology）
   cuts: [],              // 自动生成的切口（来自 cuts.json），优先于 DATA.topics
   drafts: {},            // cut_id -> {brief, proposal, research} LLM 生成的初稿
@@ -51,6 +52,8 @@ const els = {
   leaderThemeFilter: $("#leaderThemeFilter"),
   leaderSearch: $("#leaderSearch"),
   leaderStat: $("#leaderStat"),
+  centralList: $("#centralList"),
+  centralStat: $("#centralStat"),
   focusGrid: $("#focusGrid"),
   focusEyebrow: $("#focusEyebrow"),
   cutGrid: $("#cutGrid"),
@@ -166,6 +169,24 @@ async function loadLeaderSignals() {
   return [...realMarked, ...mock.filter((m) => !seen.has(m.url))];
 }
 
+async function loadCentralSignals() {
+  try {
+    const r = await fetch("./data/central_leaders.json", { cache: "no-store" });
+    if (!r.ok) return [];
+    const j = await r.json();
+    return Array.isArray(j) ? j : [];
+  } catch (e) { return []; }
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 async function loadPhraseCounts() {
   try {
     const r = await fetch("./data/phrase_chronology.json", { cache: "no-store" });
@@ -197,14 +218,17 @@ async function loadDrafts() {
 
 async function renderLeaders() {
   // 加载并缓存所有信号 + 累计次数 + 切口 + 草稿
-  const [all0, counts, cuts, drafts] = await Promise.all([
-    loadLeaderSignals(), loadPhraseCounts(), loadCuts(), loadDrafts(),
+  const [all0, central, counts, cuts, drafts] = await Promise.all([
+    loadLeaderSignals(), loadCentralSignals(), loadPhraseCounts(), loadCuts(), loadDrafts(),
   ]);
   state.drafts = drafts;
   const all = all0
     .filter((s) => s.date)
     .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   state.leaderItems = all;
+  state.centralItems = central
+    .filter((s) => s.date)
+    .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   state.phraseCounts = counts;
   state.cuts = cuts;
   // 切到自动切口后第一条作为工作台默认选中
@@ -224,9 +248,37 @@ async function renderLeaders() {
   renderTrendChart();
   renderPhraseCloud();
   renderLeaderTimeline();
+  renderCentralSignals();
   renderEvolveRecent();
   renderEvolution();
   renderLifecycle();
+}
+
+function renderCentralSignals() {
+  if (!els.centralList) return;
+  const items = state.centralItems || [];
+  if (els.centralStat) {
+    els.centralStat.textContent = items.length ? `共 ${items.length} 条 · 最近 ${items[0].date}` : "暂无记录";
+  }
+  if (!items.length) {
+    els.centralList.innerHTML = `<p class="empty-tip">近期暂无收录的中央行程。</p>`;
+    return;
+  }
+  els.centralList.innerHTML = items.slice(0, 12).map((item) => {
+    const points = (item.directives || item.key_points || []).slice(0, 4);
+    return `
+      <article class="central-card">
+        <div class="central-card-meta">
+          <span>${escapeHtml(item.date)}</span>
+          <span>${escapeHtml(item.source || "公开来源")}</span>
+        </div>
+        <h3>${escapeHtml(item.headline || "中央领导在上海的重要活动")}</h3>
+        <p class="central-summary">${escapeHtml(item.summary || "")}</p>
+        ${points.length ? `<ul class="central-points">${points.map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ul>` : ""}
+        ${item.policy_implications ? `<p class="central-policy"><strong>参政议政提示：</strong>${escapeHtml(item.policy_implications)}</p>` : ""}
+        ${item.url ? `<a class="central-source" href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">查看公开来源 →</a>` : ""}
+      </article>`;
+  }).join("");
 }
 
 /* ============ 提法生命周期 ============ */

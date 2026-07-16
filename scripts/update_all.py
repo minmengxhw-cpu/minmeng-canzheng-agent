@@ -37,6 +37,7 @@ def main() -> int:
         fetch_env["MAX_PAGES"] = str(args.max_pages)
 
     print(f"CZ Agent 自动更新开始：{datetime.now().isoformat(timespec='seconds')}")
+    run("抓取中央领导上海行程", "fetch_central.py", fetch_env)
     run("抓取并分析领导动向", "fetch_leaders.py", fetch_env)
     run("生成动向速递", "gen_brief.py")
     run("重算候选切口", "gen_cuts.py")
