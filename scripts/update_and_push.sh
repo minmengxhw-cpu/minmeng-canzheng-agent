@@ -4,6 +4,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+git fetch origin main
+git merge --ff-only origin/main
+
 python3 scripts/update_all.py --max-pages 6 --skip-drafts
 
 git add data/*.json briefs/*.md

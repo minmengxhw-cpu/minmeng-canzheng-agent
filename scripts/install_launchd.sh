@@ -2,12 +2,16 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+RUNTIME_ROOT="$HOME/Library/Application Support/minmeng-canzheng-agent"
 LABEL="com.minmeng.canzheng-agent"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
-LOG_DIR="$ROOT/data/logs"
-mkdir -p "$HOME/Library/LaunchAgents" "$LOG_DIR"
+LOG_DIR="$RUNTIME_ROOT/data/logs"
+mkdir -p "$HOME/Library/LaunchAgents" "$RUNTIME_ROOT" "$LOG_DIR"
 
-python3 - "$ROOT" "$PLIST" "$LOG_DIR" <<'PY'
+# macOS launchd 对 Documents 下的脚本可能受 TCC 限制；把运行副本放到用户 Library。
+rsync -a --exclude 'data/logs/' "$ROOT/" "$RUNTIME_ROOT/"
+
+python3 - "$RUNTIME_ROOT" "$PLIST" "$LOG_DIR" <<'PY'
 import plistlib, sys
 from pathlib import Path
 
@@ -15,10 +19,13 @@ root, plist_path, log_dir = map(Path, sys.argv[1:])
 data = {
     "Label": "com.minmeng.canzheng-agent",
     "ProgramArguments": [
+        "/bin/bash",
         str(root / "scripts" / "update_and_push.sh"),
     ],
-    "WorkingDirectory": str(root),
-    "EnvironmentVariables": {"PATH": "/Users/cheer/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"},
+    "EnvironmentVariables": {
+        "HOME": str(Path.home()),
+        "PATH": "/Users/cheer/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
+    },
     "StartCalendarInterval": [
         {"Hour": 9, "Minute": 0},
         {"Hour": 21, "Minute": 0},
