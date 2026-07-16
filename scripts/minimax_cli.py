@@ -55,7 +55,7 @@ def minimax_json(system: str, user: str, max_tokens: int = 1800, temperature: fl
         executable, "--non-interactive", "--quiet", "--output", "json",
         "text", "chat", "--system", system, "--message", user,
         "--max-tokens", str(max_tokens), "--temperature", str(temperature),
-        "--model", os.environ.get("MINIMAX_MODEL", "MiniMax-M2.7"),
+        "--model", os.environ.get("MINIMAX_MODEL", "MiniMax-M3.0"),
     ]
     try:
         result = subprocess.run(

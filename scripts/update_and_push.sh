@@ -7,7 +7,9 @@ cd "$ROOT"
 git fetch origin main
 git merge --ff-only origin/main
 
-python3 scripts/update_all.py --max-pages 6 --skip-drafts
+SINCE="$(date -v-7d +%F)"
+MINIMAX_MODEL="${MINIMAX_MODEL:-MiniMax-M3.0}" \
+  python3 scripts/update_all.py --since "$SINCE" --max-pages 6 --skip-drafts
 
 git add data/*.json briefs/*.md
 if git diff --cached --quiet; then

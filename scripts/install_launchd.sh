@@ -25,6 +25,7 @@ data = {
     "EnvironmentVariables": {
         "HOME": str(Path.home()),
         "PATH": "/Users/cheer/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
+        "MINIMAX_MODEL": "MiniMax-M3.0",
     },
     "StartCalendarInterval": [
         {"Hour": 9, "Minute": 0},
