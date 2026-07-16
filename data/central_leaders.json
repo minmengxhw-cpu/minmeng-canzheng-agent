@@ -1,7 +1,7 @@
 [
   {
     "id": "central-461686d217ac2d036e70",
-    "date": "2026-07-16",
+    "date": "2026-07-15",
     "leader": "中央领导",
     "role": "中央层面重要活动",
     "role_rank": 0,
@@ -28,6 +28,31 @@
       "建议就防汛防台、城市韧性建设、应急管理体系完善等安全议题开展民主监督和建言献策，为守护超大城市安全底线贡献党派智慧"
     ],
     "source": "上海市人民政府",
-    "url": "https://www.shanghai.gov.cn/nw4411/20260716/1deb24dfb6dd4140b751189cf7976832.html"
+    "url": "https://www.shanghai.gov.cn/nw4411/20260716/1deb24dfb6dd4140b751189cf7976832.html",
+    "sources": [
+      {
+        "name": "央视网（政府网要闻）",
+        "tier": "中央权威",
+        "url": "https://tv.cctv.com/2026/07/15/VIDEL58MxDoQQygMG2x4IlyF260715.shtml"
+      },
+      {
+        "name": "中国政府网",
+        "tier": "中央权威",
+        "url": "https://www.gov.cn/yaowen/liebiao/202607/content_7075606.htm"
+      },
+      {
+        "name": "中国政府网",
+        "tier": "中央权威",
+        "url": "https://www.gov.cn/yaowen/liebiao/202607/content_7075709.htm"
+      },
+      {
+        "name": "上海市人民政府",
+        "tier": "上海官方",
+        "url": "https://www.shanghai.gov.cn/nw4411/20260716/1deb24dfb6dd4140b751189cf7976832.html"
+      }
+    ],
+    "source_count": 4,
+    "verification_status": "权威来源已核验",
+    "source_tier": "上海官方"
   }
 ]
