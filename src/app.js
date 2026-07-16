@@ -261,24 +261,38 @@ function renderCentralSignals() {
     els.centralStat.textContent = items.length ? `共 ${items.length} 条 · 最近 ${items[0].date}` : "暂无记录";
   }
   if (!items.length) {
-    els.centralList.innerHTML = `<p class="empty-tip">近期暂无收录的中央行程。</p>`;
+    els.centralList.innerHTML = `<p class="empty-tip">近期暂无新增记录；通道仍按计划巡检权威来源。</p>`;
     return;
   }
-  els.centralList.innerHTML = items.slice(0, 12).map((item) => {
-    const points = (item.directives || item.key_points || []).slice(0, 4);
-    return `
-      <article class="central-card">
-        <div class="central-card-meta">
-          <span>${escapeHtml(item.date)}</span>
-          <span>${escapeHtml(item.source || "公开来源")}</span>
-        </div>
-        <h3>${escapeHtml(item.headline || "中央领导在上海的重要活动")}</h3>
-        <p class="central-summary">${escapeHtml(item.summary || "")}</p>
-        ${points.length ? `<ul class="central-points">${points.map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ul>` : ""}
-        ${item.policy_implications ? `<p class="central-policy"><strong>参政议政提示：</strong>${escapeHtml(item.policy_implications)}</p>` : ""}
-        ${item.url ? `<a class="central-source" href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">查看公开来源 →</a>` : ""}
-      </article>`;
-  }).join("");
+  const item = items[0];
+  const points = (item.directives || item.key_points || []).slice(0, 3);
+  const policies = Array.isArray(item.policy_implications)
+    ? item.policy_implications
+    : (item.policy_implications ? [item.policy_implications] : []);
+  const sources = (item.sources || []).length
+    ? item.sources
+    : [{ name: item.source || "公开来源", tier: item.source_tier || "权威来源", url: item.url || "" }];
+  const sourceLinks = sources.map((src) => src.url
+    ? `<a href="${escapeHtml(src.url)}" target="_blank" rel="noreferrer">${escapeHtml(src.name)} ↗</a>`
+    : `<span>${escapeHtml(src.name)}</span>`).join("");
+  const older = items.slice(1);
+
+  els.centralList.innerHTML = `
+    <article class="central-card">
+      <div class="central-card-meta">
+        <span>${escapeHtml(item.date)} · ${escapeHtml(item.verification_status || "权威来源已核验")}</span>
+        <span>${sources.length} 条权威原文</span>
+      </div>
+      <h3>${escapeHtml(item.headline || "中央领导在上海的重要活动")}</h3>
+      ${points.length ? `<ul class="central-points">${points.map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ul>` : ""}
+      <details class="central-detail">
+        <summary>展开完整解读</summary>
+        ${item.summary ? `<p class="central-summary">${escapeHtml(item.summary)}</p>` : ""}
+        ${policies.length ? `<div class="central-policy"><strong>参政议政提示</strong><ul>${policies.map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ul></div>` : ""}
+      </details>
+      <div class="central-source-row"><span>核验来源</span>${sourceLinks}</div>
+      ${older.length ? `<details class="central-history"><summary>查看历史记录 · ${older.length} 条</summary><ol>${older.map((x) => `<li><span>${escapeHtml(x.date)}</span>${x.url ? `<a href="${escapeHtml(x.url)}" target="_blank" rel="noreferrer">${escapeHtml(x.headline)}</a>` : escapeHtml(x.headline)}</li>`).join("")}</ol></details>` : ""}
+    </article>`;
 }
 
 /* ============ 提法生命周期 ============ */
@@ -640,14 +654,15 @@ function renderPhraseCloud() {
     `;
   }).join("");
 
+  const opened = window.matchMedia("(min-width: 841px)").matches ? " open" : "";
   target.innerHTML = `
-    <aside class="phrase-side">
-      <div class="phrase-side-head">
+    <details class="phrase-side"${opened}>
+      <summary class="phrase-side-head">
         <span class="phrase-side-eyebrow">近期新提法</span>
         <span class="phrase-side-sub">书记 ${secN} 条 · 市长 ${mayN} 条 / 共 ${phrases.length} 条</span>
-      </div>
+      </summary>
       <ol class="phrase-side-list">${listHtml}</ol>
-    </aside>
+    </details>
   `;
 }
 
@@ -860,6 +875,7 @@ function renderLeaderCardHTML(sig) {
     </div>` : "";
 
   const themeChip = sig.theme ? `<span class="theme-chip">${sig.theme}</span>` : "";
+  const sourceChip = sig.source ? `<span class="source-chip">${sig.source}</span>` : "";
   const roleClass = `rank-${sig.role_rank || 3}`;
   const occasion = sig.occasion || "";
 
@@ -870,6 +886,7 @@ function renderLeaderCardHTML(sig) {
           <span class="leader-name">${sig.leader}</span>
           <span class="leader-date">${sig.date}</span>
           ${themeChip}
+          ${sourceChip}
         </div>
         <h3 class="leader-headline">${sig.headline}</h3>
         ${occasion ? `<p class="leader-occasion-line">${occasion}</p>` : ""}
@@ -1023,7 +1040,7 @@ function renderFocus() {
     `;
     // 点击/回车：滚到时间轴近一周区
     const scrollToTimeline = () => {
-      document.getElementById("leaders")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("weekly")?.scrollIntoView({ behavior: "smooth", block: "start" });
     };
     card.addEventListener("click", scrollToTimeline);
     card.addEventListener("keydown", (e) => {

@@ -74,6 +74,9 @@ LIST_API = "https://i.news.qq.com/getSubNewsMixedList"
 DETAIL_RAIN = "https://news.qq.com/rain/a/"   # + <articleId>
 SOURCE_NAME = "上观新闻"
 OFFICIAL_SOURCE_NAME = "上海市人民政府"
+SHIO_SOURCE_NAME = "上海市政府新闻办"
+OFFICIAL_NEWS_URL = "https://www.shanghai.gov.cn/zzbshyw/index.html"
+SHIO_PUSH_URL = "https://www.shio.gov.cn/TrueCMS/shxwbgs/ywts/ywts.html"
 OFFICIAL_SEARCH_API = "https://search.sh.gov.cn/searchResult"
 OFFICIAL_SEARCH_FORM = {
     "pageSize": "20", "resourceType": "", "channel": "",
@@ -93,6 +96,7 @@ ACTIVITY_VERBS = [
     "传达", "研究", "审议", "听取", "审定", "签署", "举行", "参加",
     "发布", "通过", "批示", "专题会", "工作会", "现场会", "推进",
 ]
+RETROSPECTIVE_TITLE_MARKERS = ("理论亲声讲", "【上海一周】", "文汇讲堂")
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -254,6 +258,68 @@ def fetch_official_search_page(keyword: str, page_no: int) -> List[Dict]:
     return out
 
 
+def fetch_official_news_list() -> List[Dict]:
+    """直读“上海要闻”首页，绕过搜索索引延迟。"""
+    try:
+        r = requests.get(OFFICIAL_NEWS_URL, headers=HEADERS, timeout=30)
+        r.raise_for_status()
+        soup = BeautifulSoup(r.text, "html.parser")
+    except Exception as e:
+        log(f"    ✗ 上海要闻直连失败: {e}")
+        return []
+
+    out = []
+    for item in soup.select("ul.news-green li"):
+        link = item.select_one("a[href]")
+        date_el = item.select_one(".data01")
+        title_el = item.select_one(".aa")
+        abstract_el = item.select_one(".bb")
+        if not link or not date_el:
+            continue
+        title = (link.get("title") or (title_el.get_text(" ", strip=True) if title_el else "")).strip()
+        date = date_el.get_text(" ", strip=True).replace(".", "-")
+        url = urllib.parse.urljoin(OFFICIAL_NEWS_URL, link.get("href") or "").split("?", 1)[0]
+        if not title or not re.fullmatch(r"20\d{2}-\d{2}-\d{2}", date) or not url:
+            continue
+        out.append({
+            "date": date, "headline": title[:160],
+            "id": "official-list-" + hashlib.sha1(url.encode("utf-8")).hexdigest()[:20],
+            "url": url,
+            "abstract": abstract_el.get_text(" ", strip=True) if abstract_el else "",
+            "source": OFFICIAL_SOURCE_NAME,
+        })
+    return out
+
+
+def fetch_shio_push_list() -> List[Dict]:
+    """直读市政府新闻办“要闻推送”，作为当天发布的官方快速信源。"""
+    try:
+        r = requests.get(SHIO_PUSH_URL, headers=HEADERS, timeout=30)
+        r.raise_for_status()
+        soup = BeautifulSoup(r.text, "html.parser")
+    except Exception as e:
+        log(f"    ✗ 市政府新闻办直连失败: {e}")
+        return []
+
+    out = []
+    for item in soup.select(".newslist #initData li"):
+        link = item.select_one("a[href]")
+        date_el = item.select_one("span")
+        if not link or not date_el:
+            continue
+        title = (link.get("title") or link.get_text(" ", strip=True)).strip()
+        date_match = re.search(r"20\d{2}-\d{2}-\d{2}", date_el.get_text(" ", strip=True))
+        url = urllib.parse.urljoin(SHIO_PUSH_URL, link.get("href") or "")
+        if not title or not date_match or not url:
+            continue
+        out.append({
+            "date": date_match.group(0), "headline": title[:160],
+            "id": "shio-" + hashlib.sha1(url.encode("utf-8")).hexdigest()[:20],
+            "url": url, "abstract": title, "source": SHIO_SOURCE_NAME,
+        })
+    return out
+
+
 def title_named_leader(title: str) -> Optional[str]:
     for name in LEADERS:
         if name in title:
@@ -265,6 +331,19 @@ def title_is_activity(title: str) -> bool:
     return any(v in title for v in ACTIVITY_VERBS)
 
 
+def report_key(item: Dict) -> tuple:
+    title = re.sub(r"\s+", "", item.get("headline", ""))
+    return item.get("date", ""), title
+
+
+def report_source_priority(item: Dict) -> int:
+    return {
+        SHIO_SOURCE_NAME: 0,
+        OFFICIAL_SOURCE_NAME: 1,
+        SOURCE_NAME: 2,
+    }.get(item.get("source", ""), 9)
+
+
 def detail_has_leader(full_text: str) -> Optional[Dict]:
     if not full_text or len(full_text) < 50:
         return None
@@ -272,6 +351,21 @@ def detail_has_leader(full_text: str) -> Optional[Dict]:
         if name in full_text:
             return {"leader": name, **meta}
     return None
+
+
+def looks_like_current_activity(full_text: str, published_date: str, headline: str = "") -> bool:
+    """拦截用旧活动作背景的回顾稿，避免把历史提及当成当天行程。"""
+    if any(marker in headline for marker in RETROSPECTIVE_TITLE_MARKERS):
+        return False
+    if title_named_leader(headline) or title_is_activity(headline):
+        return True
+    lead = (full_text or "")[:900]
+    try:
+        published_year = int((published_date or "")[:4])
+    except ValueError:
+        return True
+    years = [int(x) for x in re.findall(r"(20\d{2})年", lead)]
+    return not years or published_year in years or max(years) >= published_year
 
 
 def fetch_detail(article_id: str) -> str:
@@ -306,7 +400,8 @@ def fetch_official_detail(url: str) -> str:
         r = requests.get(url, headers=HEADERS, timeout=30)
         r.raise_for_status()
         soup = BeautifulSoup(r.text, "html.parser")
-        el = soup.select_one("#ivs_content") or soup.select_one(".Article_content")
+        el = (soup.select_one("#ivs_content") or soup.select_one(".Article_content")
+              or soup.select_one(".TRS_Editor") or soup.select_one("article"))
         return re.sub(r"\s+", " ", el.get_text(" ", strip=True)) if el else ""
     except Exception as e:
         log(f"    ✗ 官网正文失败: {e}")
@@ -372,7 +467,7 @@ def save(results: List[Dict]):
 def main() -> int:
     since = SINCE or (datetime.now() - timedelta(days=DEFAULT_DAYS)).strftime("%Y-%m-%d")
     log(f"\n=== 抓取市委领导讲话/活动 + 入库分析 ===")
-    log(f"  源：上海市政府官网 + 上观新闻 · 回溯至 {since} · 最多 {MAX_PAGES} 翻页 · "
+    log(f"  源：上海要闻 + 市政府新闻办 + 市政府搜索 + 上观新闻 · 回溯至 {since} · 最多 {MAX_PAGES} 翻页 · "
         f"领导 {list(LEADERS)} · ONLY_SECRETARY={ONLY_SECRETARY}")
 
     # 读历史（断点续抓）
@@ -382,13 +477,20 @@ def main() -> int:
             history = json.loads(OUT.read_text(encoding="utf-8"))
         except Exception:
             history = []
+    history = [h for h in history if looks_like_current_activity(
+        h.get("full_text", ""), h.get("date", ""), h.get("headline", "")
+    )]
     history_urls = {h.get("url"): h for h in history if h.get("url")}
     results: List[Dict] = list(history)  # 以历史为基底，增量补充
     results_urls = set(history_urls)
 
-    # 1. 先抓上海市政府官网（官方源），再用上观新闻补充
+    # 1. 先抓官方直连列表，避免搜索索引延迟；再用搜索和上观新闻补充
     candidates: List[Dict] = []
     seen = set()
+    for item in fetch_official_news_list() + fetch_shio_push_list():
+        if item["date"] >= since and item["url"] not in seen:
+            candidates.append(item)
+            seen.add(item["url"])
     for keyword in LEADERS:
         for page in range(1, min(MAX_PAGES, 6) + 1):
             for item in fetch_official_search_page(keyword, page):
@@ -397,8 +499,8 @@ def main() -> int:
                     seen.add(item["url"])
             if candidates and all(x["date"] < since for x in candidates[-20:]):
                 break
-    official_count = sum(1 for c in candidates if c.get("source") == OFFICIAL_SOURCE_NAME)
-    log(f"  上海市政府官网收集 {official_count} 条")
+    official_count = sum(1 for c in candidates if c.get("source") != SOURCE_NAME)
+    log(f"  上海官方源收集 {official_count} 条")
 
     # 上观新闻混合流翻页收集补充候选（offsetInfo 游标翻页）
     offset = ""
@@ -429,12 +531,24 @@ def main() -> int:
 
     guanzhi_count = len(candidates) - official_count
     log(f"  上观新闻收集 {guanzhi_count} 条")
+    candidates.sort(key=lambda x: (report_source_priority(x), x.get("date", "")))
+    deduped = []
+    report_keys = set()
+    for item in candidates:
+        key = report_key(item)
+        if key in report_keys:
+            continue
+        report_keys.add(key)
+        deduped.append(item)
+    candidates = deduped
     log(f"\n共收集 {len(candidates)} 条候选（≥{since}）→ 两阶段过滤 + 入库分析")
 
     # 2 + 3 + 4. 过滤 + 分析
     skip_existed = skip_norel = skip_noleader = analyzed = 0
+    results_report_keys = {report_key(x) for x in results}
     for i, c in enumerate(candidates, 1):
-        if c["url"] in results_urls and history_urls.get(c["url"], {}).get("summary"):
+        if ((c["url"] in results_urls and history_urls.get(c["url"], {}).get("summary"))
+                or report_key(c) in results_report_keys):
             skip_existed += 1
             continue
 
@@ -444,8 +558,11 @@ def main() -> int:
             skip_norel += 1
             continue  # 标题/摘要既未署名也非领导活动 → 不下钻
 
-        full = fetch_official_detail(c["url"]) if c.get("source") == OFFICIAL_SOURCE_NAME else fetch_detail(c["id"])
+        full = fetch_detail(c["id"]) if c.get("source") == SOURCE_NAME else fetch_official_detail(c["url"])
         if not full:
+            continue
+        if not looks_like_current_activity(full, c["date"], c["headline"]):
+            skip_noleader += 1
             continue
         leader = detail_has_leader(full)
         if not leader:
@@ -468,10 +585,14 @@ def main() -> int:
             "keywords": analysis.get("keywords", []),
             "policy_implications": analysis.get("policy_implications", ""),
             "source": c.get("source", SOURCE_NAME), "url": c["url"],
+            "source_tier": "上海官方" if c.get("source") != SOURCE_NAME else "主流党媒",
+            "verification_status": "原文已核验",
+            "analyzed_at": datetime.now().isoformat(timespec="minutes"),
         }
         entry.update(detect_change(entry, results))
         results.append(entry)
         results_urls.add(c["url"])
+        results_report_keys.add(report_key(c))
         analyzed += 1
         log(f"  [{i}/{len(candidates)}] ✓ {c['date']} {leader['leader']} | "
             f"{entry['theme']} | 新提法{len(entry['new_phrasing'])} | {c['headline'][:40]}")

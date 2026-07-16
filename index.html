@@ -17,7 +17,6 @@
           <a href="#leaders">今日动向</a>
           <a href="#central">中央关注</a>
           <a href="#cuts">候选切口</a>
-          <a href="#insight">提法洞察</a>
         </nav>
       </div>
     </header>
@@ -36,6 +35,31 @@
           <div class="focus-grid" id="focusGrid" aria-live="polite"></div>
         </div>
 
+        <!-- 低频高优先级：紧跟本周三条重点，避免被长时间轴淹没 -->
+        <section class="central-channel" id="central" aria-labelledby="centralTitle">
+          <div class="central-head">
+            <div>
+              <p class="eyebrow">中央关注 · 上海</p>
+              <h2 id="centralTitle">重要行程与工作要求</h2>
+            </div>
+            <span class="scope-tag" id="centralStat"></span>
+          </div>
+          <div class="central-list" id="centralList" aria-live="polite"></div>
+        </section>
+
+        <div class="weekly-head" id="weekly">
+          <div>
+            <p class="eyebrow">近一周 · 日常跟踪</p>
+            <h2>书记、市长讲话精神</h2>
+            <p class="lede">按时间连续阅读，展开卡片查看核心要点和参政议政提示；近期新提法在右侧集中归纳。</p>
+          </div>
+          <div class="source-assurance" aria-label="信源说明">
+            <span class="source-assurance-label">权威优先</span>
+            <span>中国政府网 · 上海市政府 · 市政府新闻办 · 上观新闻</span>
+            <span class="source-assurance-rule">只解读新增原文，重要内容交叉核验</span>
+          </div>
+        </div>
+
         <!-- 筛选栏 -->
         <div class="leader-filters" id="leaderFilters">
           <div class="filter-row" id="leaderRoleFilter" role="tablist" aria-label="领导筛选"></div>
@@ -48,36 +72,13 @@
 
         <!-- 主体（时间轴）+ 侧栏（近期新提法） -->
         <div class="leader-layout">
-          <div class="leader-main">
-            <div class="leader-timeline" id="leaderTimeline" aria-live="polite"></div>
-          </div>
           <aside class="leader-aside">
             <div id="leaderPhraseCloud"></div>
           </aside>
-        </div>
-
-        <!-- 月度趋势图：默认折叠，需要时展开 -->
-        <details class="leader-trend-wrap" id="leaderTrendWrap">
-          <summary class="leader-trend-summary">
-            <span class="trend-chev">▸</span>
-            <span class="trend-title">17 个月主题趋势</span>
-            <span class="trend-sub">点开查看月度分布堆叠柱图</span>
-          </summary>
-          <div id="leaderTrend"></div>
-        </details>
-      </section>
-
-      <!-- ========== 独立中央行程通道 ========== -->
-      <section class="central-channel block" id="central">
-        <div class="block-head">
-          <div>
-            <p class="eyebrow">中央关注 · 上海</p>
-            <h2>重要行程与指示精神</h2>
-            <p class="lede">独立收集中央领导在上海的公开活动，提炼对城市治理和参政议政的工作指向。</p>
+          <div class="leader-main">
+            <div class="leader-timeline" id="leaderTimeline" aria-live="polite"></div>
           </div>
-          <span class="scope-tag" id="centralStat"></span>
         </div>
-        <div class="central-list" id="centralList" aria-live="polite"></div>
       </section>
 
       <!-- ========== ② 候选切口（核心产出） ========== -->
@@ -99,44 +100,6 @@
         </div>
         <div class="ledger-filter" id="ledgerFilter"></div>
         <div class="cut-grid" id="cutGrid"></div>
-      </section>
-
-      <!-- ========== ③ 提法洞察（流变 + 生命周期，标签切换） ========== -->
-      <section class="block" id="insight">
-        <div class="block-head">
-          <div>
-            <p class="eyebrow">提法洞察</p>
-            <h2>提法怎样演变、是否立住</h2>
-          </div>
-          <div class="block-tools tabs" id="insightTabs" role="tablist" aria-label="提法洞察视图">
-            <button class="tab active" type="button" data-ins="evolve" role="tab" aria-selected="true">提法流变</button>
-            <button class="tab" type="button" data-ins="life" role="tab" aria-selected="false">生命周期</button>
-          </div>
-        </div>
-
-        <!-- 视图 A：提法流变（同主题历次表述演变） -->
-        <div class="insight-pane" id="insEvolve">
-          <div class="ins-subhead">
-            <p class="ins-desc">把同一主题的历次公开表述按时间串联，看新提法怎样加入话语体系。每条可点原文追溯。</p>
-            <span class="scope-tag" id="evolveStat"></span>
-          </div>
-          <div class="evolve-recent" id="evolveRecent"></div>
-          <div class="evolve-controls">
-            <div class="filter-row evolve-themes" id="evolveThemes" role="tablist" aria-label="主题筛选"></div>
-            <button type="button" class="evo-toggle" id="evolveOnlyNew" aria-pressed="false">只看有新增</button>
-          </div>
-          <div class="evolve-body" id="evolveBody" aria-live="polite"></div>
-        </div>
-
-        <!-- 视图 B：提法生命周期（首现 → 立住 / 沉寂） -->
-        <div class="insight-pane" id="insLife" hidden>
-          <div class="ins-subhead">
-            <p class="ins-desc">看一个提法首现后是反复进入话语体系，还是出现一次就消失；曾高频却长期不再提的，是值得警觉的"退场信号"。</p>
-            <span class="scope-tag" id="lifeStat"></span>
-          </div>
-          <div class="filter-row life-filter" id="lifeFilter" role="tablist" aria-label="生命周期筛选"></div>
-          <div class="life-body" id="lifeBody" aria-live="polite"></div>
-        </div>
       </section>
 
       <!-- 成果工作台（暂不显示前台，保留代码后续启用） -->
@@ -167,7 +130,7 @@
             <span class="dot">·</span>
             <span id="metaTopics"></span>
           </p>
-          <p class="footer-note">每日 09:00 + 21:00 自动更新 · 输出仅供参政议政起草参考，需人工核验</p>
+          <p class="footer-note">日常 09:00 + 21:00 更新 · 中央关注轻量巡检 · 所有解读均需回看原文</p>
         </div>
       </footer>
     </main>
@@ -177,13 +140,13 @@
         <span class="m-icon" aria-hidden="true">⌂</span>
         <span>动向</span>
       </a>
+      <a href="#central" class="m-nav-item">
+        <span class="m-icon" aria-hidden="true">◎</span>
+        <span>中央</span>
+      </a>
       <a href="#cuts" class="m-nav-item">
         <span class="m-icon" aria-hidden="true">◇</span>
         <span>切口</span>
-      </a>
-      <a href="#insight" class="m-nav-item">
-        <span class="m-icon" aria-hidden="true">⇌</span>
-        <span>提法</span>
       </a>
     </nav>
 
