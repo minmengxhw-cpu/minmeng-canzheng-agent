@@ -3085,6 +3085,17 @@ a.bi-head:hover { color: var(--accent,#9c2b21); text-decoration: underline; }
 }
 .central-card-meta span:last-child { margin-left: auto; }
 .central-card h3 { font-size: 19px; line-height: 1.45; }
+.central-location { margin-top: 5px; color: var(--ink-mute); font-size: 12.5px; }
+.central-newphrasing {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: #F7F1E9;
+  border-left: 3px solid var(--accent);
+  border-radius: 7px;
+}
+.central-newphrasing strong { display: block; color: var(--accent-deep); font-size: 12px; margin-bottom: 5px; }
+.central-newphrasing ul { margin: 0; padding-left: 18px; }
+.central-newphrasing li + li { margin-top: 4px; }
 .central-points { margin-top: 14px; }
 .central-points li + li { margin-top: 7px; }
 

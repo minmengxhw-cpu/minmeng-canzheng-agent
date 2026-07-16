@@ -8,7 +8,8 @@ git fetch origin main
 git merge --ff-only origin/main
 
 SINCE="$(date -v-7d +%F)"
-MINIMAX_MODEL="${MINIMAX_MODEL:-MiniMax-M3.0}" \
+GROK_MODEL="${GROK_MODEL:-grok-4.5}" \
+GROK_PERMISSION_MODE="${GROK_PERMISSION_MODE:-bypassPermissions}" \
   python3 scripts/update_all.py --since "$SINCE" --max-pages 6 --skip-drafts
 
 git add data/*.json briefs/*.md

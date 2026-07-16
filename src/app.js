@@ -266,6 +266,7 @@ function renderCentralSignals() {
   }
   const item = items[0];
   const points = (item.directives || item.key_points || []).slice(0, 3);
+  const newPhrases = (item.new_phrasing || []).slice(0, 4);
   const policies = Array.isArray(item.policy_implications)
     ? item.policy_implications
     : (item.policy_implications ? [item.policy_implications] : []);
@@ -283,7 +284,9 @@ function renderCentralSignals() {
         <span>${escapeHtml(item.date)} · ${escapeHtml(item.verification_status || "权威来源已核验")}</span>
         <span>${sources.length} 条权威原文</span>
       </div>
-      <h3>${escapeHtml(item.headline || "中央领导在上海的重要活动")}</h3>
+      <h3>${escapeHtml(item.headline || "中央领导开展重要考察调研")}</h3>
+      ${item.location ? `<p class="central-location">${escapeHtml(item.location)} · ${escapeHtml(item.activity_type || "考察调研")}</p>` : ""}
+      ${newPhrases.length ? `<div class="central-newphrasing"><strong>新提法</strong><ul>${newPhrases.map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ul></div>` : ""}
       ${points.length ? `<ul class="central-points">${points.map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ul>` : ""}
       <details class="central-detail">
         <summary>展开完整解读</summary>

@@ -26,7 +26,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="更新 CZ Agent 全部数据")
     parser.add_argument("--since", help="仅抓取指定日期之后的数据，格式 YYYY-MM-DD")
     parser.add_argument("--max-pages", type=int, help="抓取列表页上限")
-    parser.add_argument("--skip-drafts", action="store_true", help="跳过 MiniMax 初稿生成")
+    parser.add_argument("--skip-drafts", action="store_true", help="跳过 Grok 初稿生成")
     parser.add_argument("--draft-limit", type=int, help="本次最多生成多少个新切口初稿")
     args = parser.parse_args()
 
@@ -37,7 +37,7 @@ def main() -> int:
         fetch_env["MAX_PAGES"] = str(args.max_pages)
 
     print(f"CZ Agent 自动更新开始：{datetime.now().isoformat(timespec='seconds')}")
-    run("抓取中央领导上海行程", "fetch_central.py", fetch_env)
+    run("抓取中央领导全国考察调研", "fetch_central.py", fetch_env)
     run("抓取并分析领导动向", "fetch_leaders.py", fetch_env)
     run("生成动向速递", "gen_brief.py")
     run("重算候选切口", "gen_cuts.py")

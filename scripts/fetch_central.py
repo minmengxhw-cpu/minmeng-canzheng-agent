@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""独立抓取中央领导在上海的公开行程与重要指示。
+"""独立抓取中央领导在全国的公开考察调研与重要要求。
 
-本通道与市委主要领导数据分开存储、分开统计，只对新来源 URL 调用 MiniMax-M3.0。
+本通道与市委主要领导数据分开存储、分开统计，只对新来源 URL 调用 Grok CLI。
 公开页面中的具体身份统一在站内显示为“中央领导”，保留原文链接供追溯。
 """
 
@@ -15,7 +15,7 @@ import sys
 import urllib.parse
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fetch_leaders import (
     OFFICIAL_SOURCE_NAME,
@@ -27,9 +27,9 @@ from fetch_leaders import (
     fetch_official_news_list,
     fetch_official_search_page,
     fetch_shio_push_list,
-    minimax_json,
     parse_list,
 )
+from grok_cli import grok_json
 import requests
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -42,15 +42,22 @@ MAX_PAGES = int(os.environ.get("MAX_PAGES", "6"))
 GOV_SOURCE_NAME = "中国政府网"
 GOV_YAOWEN_JSON = "https://www.gov.cn/yaowen/liebiao/YAOWENLIEBIAO.json"
 
-OFFICIAL_QUERIES = ("总书记", "上海考察")
-ACTION_WORDS = ("考察", "调研", "视察", "讲话", "指示", "要求", "强调", "部署")
+OFFICIAL_QUERIES = ("总书记", "考察调研")
+ACTION_WORDS = ("考察", "调研", "视察", "看望", "慰问", "座谈", "讲话", "指示", "要求", "强调", "部署")
 FOLLOWUP_WORDS = ("认真学习", "学习贯彻", "激励广大", "引发热烈反响", "重要讲话精神")
+PRIMARY_ACTIVITY_RE = re.compile(
+    r"^[\u4e00-\u9fff]{2,4}.{0,12}(?:在|赴).{1,30}(?:考察|调研|视察|看望|慰问)"
+)
+PRIMARY_DETAIL_RE = re.compile(
+    r"(?:总书记|国家主席).{0,60}(?:在|赴).{0,80}(?:考察|调研|视察|看望|慰问)",
+    re.S,
+)
 
-SYSTEM_PROMPT = """你是参政议政研究助理，负责提炼中央领导在上海公开活动中的工作指向。
+SYSTEM_PROMPT = """你是参政议政研究助理，负责提炼中央领导在全国各地公开考察调研中的工作指向。
 只输出严格 JSON 对象，不要 Markdown，不要解释。
 不要输出具体人物姓名，统一称为“中央领导”。
-字段必须包括：summary、key_points、directives、theme、policy_implications。
-summary 为 120-220 字；key_points 和 directives 各 2-5 条；policy_implications 为 1-3 条可核验的参政议政建议。
+字段必须包括：location、activity_type、summary、key_points、new_phrasing、directives、theme、policy_implications。
+summary 为 120-220 字；key_points、new_phrasing 和 directives 各 2-5 条；policy_implications 为 1-3 条可核验的参政议政建议。
 所有事实和工作要求必须能在原文中直接找到依据；不得补写背景、数字、地点或因果关系。政策建议必须与事实摘要明确分开。"""
 
 
@@ -68,32 +75,34 @@ def redact_identity(value: str) -> str:
     return value
 
 
-def clean_result(value: Any) -> Any:
+def clean_result(value: Any, aliases: Optional[List[str]] = None) -> Any:
+    aliases = aliases or []
     if isinstance(value, str):
-        return redact_identity(value)
+        cleaned = redact_identity(value)
+        for alias in aliases:
+            cleaned = cleaned.replace(alias, "中央领导")
+        return cleaned
     if isinstance(value, list):
-        return [clean_result(v) for v in value]
+        return [clean_result(v, aliases) for v in value]
     if isinstance(value, dict):
-        return {k: clean_result(v) for k, v in value.items()}
+        return {k: clean_result(v, aliases) for k, v in value.items()}
     return value
 
 
 def likely_candidate(item: Dict[str, Any]) -> bool:
     text = f"{item.get('headline', '')} {item.get('abstract', '')}"
-    has_location = "上海" in text or "沪" in text
-    has_central_marker = "总书记" in text or "上海考察" in text or "中央领导" in text
-    is_primary_report = "在上海考察" in text or "上海考察时强调" in text
+    has_central_marker = (
+        "总书记" in text or "国家主席" in text or "中央领导" in text
+        or (item.get("source") == GOV_SOURCE_NAME and bool(PRIMARY_ACTIVITY_RE.search(text)))
+    )
+    is_primary_report = bool(PRIMARY_ACTIVITY_RE.search(text)) or "考察时强调" in text
     if any(word in text for word in FOLLOWUP_WORDS) and not is_primary_report:
         return False
-    return has_location and has_central_marker and any(word in text for word in ACTION_WORDS)
+    return has_central_marker and is_primary_report
 
 
 def likely_detail(text: str) -> bool:
-    return (
-        "上海" in text
-        and ("总书记" in text or "党中央" in text)
-        and any(word in text for word in ACTION_WORDS)
-    )
+    return bool(PRIMARY_DETAIL_RE.search((text or "")[:1600]))
 
 
 def fetch_gov_yaowen() -> List[Dict[str, Any]]:
@@ -171,8 +180,17 @@ def add_source(entry: Dict[str, Any], item: Dict[str, Any]) -> None:
     ) else "公开来源待复核"
 
 
-def same_event(entry: Dict[str, Any], date: str, headline: str) -> bool:
-    if entry.get("headline") != headline:
+def entry_location(entry: Dict[str, Any]) -> str:
+    return str(entry.get("location") or extract_location(entry.get("headline", ""))).strip()
+
+
+def same_event(entry: Dict[str, Any], date: str, headline: str,
+               location: str = "") -> bool:
+    stored_location = entry_location(entry)
+    incoming_location = location or extract_location(headline)
+    same_label = entry.get("headline") == headline
+    same_place = bool(stored_location and incoming_location and stored_location == incoming_location)
+    if not same_label and not same_place:
         return False
     try:
         left = datetime.strptime(entry.get("date", ""), "%Y-%m-%d")
@@ -182,12 +200,27 @@ def same_event(entry: Dict[str, Any], date: str, headline: str) -> bool:
         return entry.get("date") == date
 
 
+def extract_location(raw: str) -> str:
+    match = re.search(
+        r"(?:在|赴)([\u4e00-\u9fff]{2,12}?)(?:考察|调研|视察|看望|慰问|座谈)", raw
+    )
+    if not match:
+        return ""
+    location = match.group(1)
+    location = re.sub(r"^(?:春节前夕|期间|近日)", "", location)
+    location = re.sub(r"(?:开展|进行|深入)$", "", location)
+    return location[:10]
+
+
 def display_headline(raw: str) -> str:
-    if "上海考察" in raw or "考察" in raw:
+    location = extract_location(raw)
+    if location == "上海":
         return "中央领导在上海开展考察活动"
+    if location:
+        return f"中央领导在{location}开展考察调研"
     if "讲话" in raw or "指示" in raw:
-        return "中央领导对上海作出重要指示"
-    return "中央领导在上海的重要活动"
+        return "中央领导在全国调研中提出重要要求"
+    return "中央领导开展重要考察调研"
 
 
 def analyze(date: str, headline: str, full_text: str) -> Dict[str, Any]:
@@ -197,15 +230,18 @@ def analyze(date: str, headline: str, full_text: str) -> Dict[str, Any]:
 公开报道原文：
 {full_text[:9000]}
 
-请提炼工作指向，重点回答：对上海当前工作提出了哪些要求？哪些内容对民主党派参政议政具有直接参考价值？"""
+请提炼本次考察调研中的新提法、新要求和工作方法，重点回答：对全国相关领域提出了哪些要求？哪些内容可转化为上海民主党派参政议政的调研切口？"""
     try:
-        return clean_result(minimax_json(SYSTEM_PROMPT, prompt, max_tokens=1000, temperature=0.2))
+        aliases = sorted(set(re.findall(
+            r"([\u4e00-\u9fff]{2,4})(?:总书记|国家主席)", full_text
+        )))
+        return clean_result(grok_json(SYSTEM_PROMPT, prompt, max_tokens=1100, temperature=0.2), aliases)
     except Exception as exc:
         log(f"模型分析失败：{exc}")
         return {}
 
 
-def save(results: List[Dict[str, Any]]) -> None:
+def save(results: List[Dict[str, Any]]) -> int:
     previous_out = OUT.read_text(encoding="utf-8") if OUT.exists() else ""
     previous_latest = {}
     if LATEST.exists():
@@ -213,6 +249,10 @@ def save(results: List[Dict[str, Any]]) -> None:
             previous_latest = json.loads(LATEST.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             previous_latest = {}
+    results = [item for item in results if (
+        not item.get("activity_type")
+        or any(word in str(item.get("activity_type")) for word in ("考察", "调研", "视察", "看望", "慰问"))
+    )]
     results.sort(key=lambda x: x.get("date", ""), reverse=True)
     unique: List[Dict[str, Any]] = []
     for item in results:
@@ -221,8 +261,11 @@ def save(results: List[Dict[str, Any]]) -> None:
         for ref in item.get("sources", []):
             if "tv.cctv.com" in ref.get("url", ""):
                 ref["name"] = "央视网（政府网要闻）"
+        if entry_location(item) == "上海":
+            item["location"] = "上海"
+            item["headline"] = "中央领导在上海开展考察活动"
         matched = next((x for x in unique if same_event(
-            x, item.get("date", ""), item.get("headline", "")
+            x, item.get("date", ""), item.get("headline", ""), entry_location(item)
         )), None)
         if matched:
             matched["date"] = min(matched.get("date", ""), item.get("date", ""))
@@ -249,6 +292,7 @@ def save(results: List[Dict[str, Any]]) -> None:
         "count": len(unique),
         "latest": latest,
     }, ensure_ascii=False, indent=2), encoding="utf-8")
+    return len(unique)
 
 
 def main() -> int:
@@ -293,20 +337,27 @@ def main() -> int:
 
     analyzed = 0
     candidates.sort(key=lambda x: (source_priority(x.get("source", "")), x.get("date", "")))
+    log(f"中央通道候选：窗口 {since} 起共 {len(candidates)} 条，开始正文核验")
     for item in candidates:
         if item["url"] in history_by_url and history_by_url[item["url"]].get("summary"):
             continue
         headline = display_headline(item["headline"])
-        existing = next((entry for entry in results if same_event(entry, item["date"], headline)), None)
+        item_location = extract_location(item["headline"])
+        existing = next((entry for entry in results if same_event(
+            entry, item["date"], headline, item_location
+        )), None)
         if existing:
             existing["date"] = min(existing.get("date", item["date"]), item["date"])
             add_source(existing, item)
+            continue
+        if item.get("source") != GOV_SOURCE_NAME:
             continue
         full_text = (fetch_detail(item["id"])
                      if item.get("source") == SOURCE_NAME
                      else fetch_official_detail(item["url"]))
         if not full_text or not likely_detail(full_text):
             continue
+        log(f"  Grok 分析：{item['date']} · {headline}")
         analysis = analyze(item["date"], headline, full_text)
         if not analysis:
             continue
@@ -320,6 +371,9 @@ def main() -> int:
             "summary": analysis.get("summary", ""),
             "key_points": analysis.get("key_points", []),
             "directives": analysis.get("directives", []),
+            "new_phrasing": analysis.get("new_phrasing", []),
+            "location": analysis.get("location", extract_location(item["headline"])),
+            "activity_type": analysis.get("activity_type", "考察调研"),
             "theme": analysis.get("theme", "城市治理"),
             "policy_implications": analysis.get("policy_implications", ""),
             "source": item.get("source", SOURCE_NAME),
@@ -331,9 +385,10 @@ def main() -> int:
             "url": item["url"],
         })
         analyzed += 1
+        log(f"  已入库：{item['date']} · {headline}")
 
-    save(results)
-    log(f"中央通道：窗口 {since} 起，候选 {len(candidates)} 条，新分析 {analyzed} 条，累计 {len(results)} 条")
+    saved_count = save(results)
+    log(f"中央通道：窗口 {since} 起，候选 {len(candidates)} 条，新分析 {analyzed} 条，累计 {saved_count} 条")
     return 0
 
 
