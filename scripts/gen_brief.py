@@ -6,15 +6,27 @@ CZ Agent · 动向速递（变化主动推送 A）
 输出：
   - data/brief_latest.json   给前端「动向速递」卡片读取
   - briefs/YYYY-MM-DD.md      留档
-推送（可选）：设置环境变量 BRIEF_WEBHOOK 后，POST 简报文本到该地址（Mattermost/企业微信等 incoming webhook 通用）。
+推送（可选，主动推到手机）：
+  - FEISHU_WEBHOOK           飞书群自定义机器人（推荐）
+  - FEISHU_WEBHOOK_SECRET    可选签名密钥
+  - FEISHU_SITE_URL          卡片链接，默认 GitHub Pages
+  - FEISHU_PUSH_ALWAYS=1     无新增也推送（默认：有新增才推；设置 1 则每次都推）
+  - BRIEF_WEBHOOK            兼容旧的 Mattermost/企业微信 text webhook
 不调大模型，纯规则生成，稳定可靠。
 """
-import json, os, datetime, urllib.request
+import json
+import os
+import datetime
+import urllib.request
+import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "scripts"))
+
 LEADERS = os.path.join(ROOT, "data", "leaders.json")
 OUT_JSON = os.path.join(ROOT, "data", "brief_latest.json")
 BRIEF_DIR = os.path.join(ROOT, "briefs")
+SITE_DEFAULT = "https://minmengxhw-cpu.github.io/minmeng-canzheng-agent/"
 
 
 def np_of(s):
@@ -25,6 +37,68 @@ def np_of(s):
 def dminus(ymd, n):
     y, m, d = map(int, ymd.split("-"))
     return (datetime.date(y, m, d) - datetime.timedelta(days=n)).isoformat()
+
+
+def _push_feishu(summary: str, today_items: list, maxd: str, md_text: str) -> None:
+    """主动推送到飞书（手机 App 会收到通知）。"""
+    hook = os.environ.get("FEISHU_WEBHOOK", "").strip()
+    if not hook:
+        return
+    always = os.environ.get("FEISHU_PUSH_ALWAYS", "").strip() in ("1", "true", "yes")
+    if not today_items and not always:
+        print("brief: 飞书跳过（当日无新增；设 FEISHU_PUSH_ALWAYS=1 可强制推）")
+        return
+    try:
+        from feishu_push import push_brief_card, push_text
+    except ImportError:
+        # 同目录直接 import
+        import importlib.util
+        path = os.path.join(ROOT, "scripts", "feishu_push.py")
+        spec = importlib.util.spec_from_file_location("feishu_push", path)
+        mod = importlib.util.module_from_spec(spec)
+        assert spec.loader
+        spec.loader.exec_module(mod)
+        push_brief_card = mod.push_brief_card
+        push_text = mod.push_text
+
+    lines = []
+    for i in today_items[:6]:
+        who = f"〔{i['role']}〕" if i.get("role") else ""
+        head = (i.get("headline") or "")[:80]
+        theme = i.get("theme") or ""
+        lines.append(f"{who}{head}" + (f" · {theme}" if theme else ""))
+    title = f"📍 CZ Agent 动向速递 · {maxd}"
+    r = push_brief_card(title, summary, item_lines=lines or None)
+    if r.get("ok"):
+        print("brief: 已主动推送飞书")
+        return
+    # 卡片失败则退回纯文本
+    print(f"brief: 飞书卡片失败 {r}，尝试文本…")
+    r2 = push_text(f"{title}\n\n{summary}\n\n{SITE_DEFAULT}")
+    if r2.get("ok"):
+        print("brief: 已主动推送飞书（文本）")
+    else:
+        print(f"brief: 飞书推送失败 {r2}")
+
+
+def _push_legacy_webhook(md_text: str, today_items: list) -> None:
+    hook = os.environ.get("BRIEF_WEBHOOK", "").strip()
+    if not hook:
+        return
+    always = os.environ.get("FEISHU_PUSH_ALWAYS", "").strip() in ("1", "true", "yes")
+    if not today_items and not always:
+        return
+    try:
+        payload = {"text": "**📍 CZ Agent 动向速递**\n\n" + md_text}
+        req = urllib.request.Request(
+            hook,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+        )
+        urllib.request.urlopen(req, timeout=15)
+        print("brief: 已推送 BRIEF_WEBHOOK")
+    except Exception as e:
+        print(f"brief: BRIEF_WEBHOOK 推送失败 {e}")
 
 
 def main():
@@ -50,7 +124,6 @@ def main():
     since = dminus(maxd, 6)
     week = [s for s in data if s["date"] >= since]
     week_phrases = sum(len(np_of(s)) for s in week)
-    # 近7天最活跃主题
     theme_cnt = {}
     for s in week:
         t = s.get("theme")
@@ -93,20 +166,15 @@ def main():
     lines.append(f"## 近 7 天（{since} ~ {maxd}）")
     lines.append(f"- 公开信号 {len(week)} 条 · 新提法 {week_phrases} 条")
     lines.append(f"- 最活跃主题：{hot_txt}")
+    lines.append("")
+    lines.append(f"网页：{os.environ.get('FEISHU_SITE_URL', SITE_DEFAULT).strip() or SITE_DEFAULT}")
     md_text = "\n".join(lines)
     open(os.path.join(BRIEF_DIR, f"{maxd}.md"), "w", encoding="utf-8").write(md_text)
 
-    # 可选：推送到工作群（Mattermost / 企业微信 incoming webhook）
-    hook = os.environ.get("BRIEF_WEBHOOK", "").strip()
-    if hook and today_items:
-        try:
-            payload = {"text": "**📍 CZ Agent 动向速递**\n\n" + md_text}
-            req = urllib.request.Request(hook, data=json.dumps(payload).encode("utf-8"),
-                                         headers={"Content-Type": "application/json"})
-            urllib.request.urlopen(req, timeout=15)
-            print("brief: 已推送工作群")
-        except Exception as e:
-            print(f"brief: 推送失败 {e}")
+    # 主动推送：飞书（手机）
+    _push_feishu(summary, today_items, maxd, md_text)
+    # 兼容旧 webhook
+    _push_legacy_webhook(md_text, today_items)
 
     print(f"brief: {summary}")
 

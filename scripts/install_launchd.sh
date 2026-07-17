@@ -14,7 +14,7 @@ mkdir -p "$HOME/Library/LaunchAgents" "$RUNTIME_ROOT" "$LOG_DIR"
 rsync -a --delete --exclude 'data/logs/' "$ROOT/" "$RUNTIME_ROOT/"
 
 python3 - "$RUNTIME_ROOT" "$PLIST" "$LOG_DIR" <<'PY'
-import plistlib, sys
+import os, plistlib, sys
 from pathlib import Path
 
 root, plist_path, log_dir = map(Path, sys.argv[1:])
@@ -24,6 +24,30 @@ common_env = {
     "GROK_MODEL": "grok-4.5",
     "GROK_PERMISSION_MODE": "bypassPermissions",
 }
+# 从本地 .env 注入飞书 Webhook（不写进仓库）
+env_candidates = [
+    root / ".env",
+    Path.home() / "Library/Application Support/minmeng-canzheng-agent/.env",
+    Path.home() / ".config/minmeng-canzheng-agent/env",
+]
+for env_path in env_candidates:
+    if not env_path.is_file():
+        continue
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, _, v = line.partition("=")
+        k, v = k.strip(), v.strip().strip('"').strip("'")
+        if k in (
+            "FEISHU_WEBHOOK",
+            "FEISHU_WEBHOOK_SECRET",
+            "FEISHU_SITE_URL",
+            "FEISHU_PUSH_ALWAYS",
+            "BRIEF_WEBHOOK",
+        ):
+            common_env[k] = v
+    break
 data = {
     "Label": "com.minmeng.canzheng-agent",
     "ProgramArguments": [
@@ -40,6 +64,10 @@ data = {
 }
 plist_path.write_bytes(plistlib.dumps(data))
 print(plist_path)
+if "FEISHU_WEBHOOK" in common_env:
+    print("已注入 FEISHU_WEBHOOK（飞书主动推送已启用）")
+else:
+    print("未找到 FEISHU_WEBHOOK：请写到 Application Support 下 .env 后重跑本脚本")
 PY
 
 launchctl bootout "gui/$(id -u)" "$PLIST" 2>/dev/null || true
