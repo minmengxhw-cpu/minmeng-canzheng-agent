@@ -38,7 +38,7 @@
     ],
     "source": "上观新闻",
     "source_tier": "主流党媒",
-    "source_count": 6,
+    "source_count": 7,
     "verification_status": "权威来源已核验",
     "sources": [
       {
@@ -62,6 +62,11 @@
         "url": "https://www.shanghai.gov.cn/nw4411/20260716/1deb24dfb6dd4140b751189cf7976832.html"
       },
       {
+        "name": "上海市人民政府",
+        "tier": "上海官方",
+        "url": "https://www.shanghai.gov.cn/nw4411/20260716/1d796cd6409646929e783985cd9c920a.html"
+      },
+      {
         "name": "上观新闻",
         "tier": "主流党媒",
         "url": "https://view.inews.qq.com/a/20260716A0BJA700"
@@ -74,7 +79,7 @@
     ],
     "analyzed_at": "2026-07-16T21:20",
     "url": "https://view.inews.qq.com/a/20260716A0BJA700",
-    "last_verified_at": "2026-07-16T21:22"
+    "last_verified_at": "2026-07-17T09:00"
   },
   {
     "id": "central-4963368e3c07e9268df5",
