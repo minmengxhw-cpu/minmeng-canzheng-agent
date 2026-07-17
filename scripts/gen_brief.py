@@ -7,8 +7,9 @@ CZ Agent · 动向速递（变化主动推送 A）
   - data/brief_latest.json   给前端「动向速递」卡片读取
   - briefs/YYYY-MM-DD.md      留档
 推送（可选，主动推到手机）：
-  - FEISHU_WEBHOOK           飞书群自定义机器人（推荐）
+  - FEISHU_WEBHOOK           飞书群自定义机器人 Webhook（可选）
   - FEISHU_WEBHOOK_SECRET    可选签名密钥
+  - FEISHU_CHAT_ID           应用机器人推送群 oc_xxx（lark-cli 配置路径）
   - FEISHU_SITE_URL          卡片链接，默认 GitHub Pages
   - FEISHU_PUSH_ALWAYS=1     无新增也推送（默认：有新增才推；设置 1 则每次都推）
   - BRIEF_WEBHOOK            兼容旧的 Mattermost/企业微信 text webhook
@@ -42,7 +43,8 @@ def dminus(ymd, n):
 def _push_feishu(summary: str, today_items: list, maxd: str, md_text: str) -> None:
     """主动推送到飞书（手机 App 会收到通知）。"""
     hook = os.environ.get("FEISHU_WEBHOOK", "").strip()
-    if not hook:
+    chat_id = os.environ.get("FEISHU_CHAT_ID", "").strip()
+    if not hook and not chat_id:
         return
     always = os.environ.get("FEISHU_PUSH_ALWAYS", "").strip() in ("1", "true", "yes")
     if not today_items and not always:
@@ -70,7 +72,8 @@ def _push_feishu(summary: str, today_items: list, maxd: str, md_text: str) -> No
     title = f"📍 CZ Agent 动向速递 · {maxd}"
     r = push_brief_card(title, summary, item_lines=lines or None)
     if r.get("ok"):
-        print("brief: 已主动推送飞书")
+        ch = r.get("channel") or ("webhook" if hook else "lark-cli")
+        print(f"brief: 已主动推送飞书（{ch}）")
         return
     # 卡片失败则退回纯文本
     print(f"brief: 飞书卡片失败 {r}，尝试文本…")

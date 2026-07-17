@@ -11,7 +11,12 @@ LOG_DIR="$RUNTIME_ROOT/data/logs"
 mkdir -p "$HOME/Library/LaunchAgents" "$RUNTIME_ROOT" "$LOG_DIR"
 
 # macOS launchd 对 Documents 下的脚本可能受 TCC 限制；把运行副本放到用户 Library。
-rsync -a --delete --exclude 'data/logs/' "$ROOT/" "$RUNTIME_ROOT/"
+# 保留运行目录本地密钥与日志，避免 --delete 清掉 .env
+rsync -a --delete \
+  --exclude 'data/logs/' \
+  --exclude '.env' \
+  --exclude '.env.*' \
+  "$ROOT/" "$RUNTIME_ROOT/"
 
 python3 - "$RUNTIME_ROOT" "$PLIST" "$LOG_DIR" <<'PY'
 import os, plistlib, sys
@@ -42,8 +47,11 @@ for env_path in env_candidates:
         if k in (
             "FEISHU_WEBHOOK",
             "FEISHU_WEBHOOK_SECRET",
+            "FEISHU_CHAT_ID",
+            "FEISHU_JOIN_URL",
             "FEISHU_SITE_URL",
             "FEISHU_PUSH_ALWAYS",
+            "LARK_CLI",
             "BRIEF_WEBHOOK",
         ):
             common_env[k] = v
@@ -65,9 +73,11 @@ data = {
 plist_path.write_bytes(plistlib.dumps(data))
 print(plist_path)
 if "FEISHU_WEBHOOK" in common_env:
-    print("已注入 FEISHU_WEBHOOK（飞书主动推送已启用）")
+    print("已注入 FEISHU_WEBHOOK（飞书 Webhook 推送已启用）")
+elif "FEISHU_CHAT_ID" in common_env:
+    print("已注入 FEISHU_CHAT_ID（lark-cli 应用机器人推送已启用）")
 else:
-    print("未找到 FEISHU_WEBHOOK：请写到 Application Support 下 .env 后重跑本脚本")
+    print("未找到 FEISHU_WEBHOOK / FEISHU_CHAT_ID：请写到 Application Support 下 .env 后重跑本脚本")
 PY
 
 launchctl bootout "gui/$(id -u)" "$PLIST" 2>/dev/null || true

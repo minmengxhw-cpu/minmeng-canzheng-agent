@@ -10,26 +10,42 @@
 
 日更生成简报后，可**主动**发到飞书（手机 App 推送）。
 
-### 1. 建机器人
+支持两条通道（二选一即可）：
 
-1. 手机/电脑打开飞书 → 建一个群（可只拉自己）  
-2. 群设置 → 群机器人 → 添加 **自定义机器人**  
-3. 复制 **Webhook 地址**  
-4. 建议开启 **签名校验**，并记下密钥  
+| 通道 | 环境变量 | 说明 |
+|------|----------|------|
+| **应用机器人 + lark-cli**（推荐） | `FEISHU_CHAT_ID` | 用 `lark-cli` 建群/发消息，无需 Webhook |
+| 自定义机器人 Webhook | `FEISHU_WEBHOOK` | 群里加「自定义机器人」后复制 Webhook |
 
-### 2. 本机配置（不要提交 Git）
+### 1. 用 lark-cli 一键配置（推荐）
+
+前提：本机 `lark-cli auth status` 里 **bot 身份 ready**。
 
 ```bash
+# 建公开推送群（把你的 open_id 换成自己的；可用 lark-cli whoami 查看）
+lark-cli im +chat-create --as bot \
+  --name "民盟参政议政雷达推送" \
+  --description "CZ Agent 日更简报主动推送群" \
+  --type public \
+  --users "ou_你的open_id" \
+  --set-bot-manager
+
+# 记下返回的 chat_id 与 share_link，写入本机 .env：
 mkdir -p "$HOME/Library/Application Support/minmeng-canzheng-agent"
 cat > "$HOME/Library/Application Support/minmeng-canzheng-agent/.env" <<'EOF'
-FEISHU_WEBHOOK=https://open.feishu.cn/open-apis/bot/v2/hook/你的key
-FEISHU_WEBHOOK_SECRET=你的签名密钥
-# 可选：无新增也推送
+FEISHU_CHAT_ID=oc_xxxxxxxx
+FEISHU_JOIN_URL=https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=xxxx
 # FEISHU_PUSH_ALWAYS=1
 # FEISHU_SITE_URL=https://minmengxhw-cpu.github.io/minmeng-canzheng-agent/
 EOF
 chmod 600 "$HOME/Library/Application Support/minmeng-canzheng-agent/.env"
 ```
+
+### 2. 或用自定义机器人 Webhook
+
+1. 飞书建群 → 群机器人 → **自定义机器人** → 复制 Webhook  
+2. 建议开启签名校验，密钥写入 `FEISHU_WEBHOOK_SECRET`  
+3. `.env` 里配置 `FEISHU_WEBHOOK=...`（与 `FEISHU_CHAT_ID` 二选一即可；同时配时优先 Webhook）
 
 ### 3. 测试推送
 
@@ -57,17 +73,9 @@ bash scripts/install_launchd.sh
 
 ### 管理员一次性配置
 
-1. 飞书建**推送群**（可设为公开/允许分享入群）  
-2. 把上面的**自定义机器人**加进这个群（Webhook 即 `FEISHU_WEBHOOK`）  
-3. 群设置 → **分享** → 复制 **邀请链接**（`applink.feishu.cn/...`）  
-4. 写入本地 `.env`：
-
-```bash
-echo 'FEISHU_JOIN_URL=https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=你的token' \
-  >> "$HOME/Library/Application Support/minmeng-canzheng-agent/.env"
-```
-
-5. 生成二维码并发布到网站：
+1. 已有推送群与 `FEISHU_CHAT_ID` / 或 Webhook  
+2. 将建群返回的 `share_link`（或群设置 → 分享链接）写入 `FEISHU_JOIN_URL`  
+3. 生成二维码并发布到网站：
 
 ```bash
 cd "/path/to/minmeng-canzheng-agent"
@@ -78,6 +86,6 @@ git commit -m "docs: publish Feishu join QR for push subscribers"
 git push origin main
 ```
 
-6. 打开网站底部 **「扫码加入，主动收消息」**，用手机飞书扫码验证。
+4. 打开网站底部 **「扫码加入，主动收消息」**，用手机飞书扫码验证。
 
-> 说明：二维码指向的是**群邀请链接**，不是 Webhook 密钥。Webhook 只保存在本机 `.env`，不要放进二维码。
+> 说明：二维码指向的是**群邀请链接**，不是 Webhook / chat_id 密钥。密钥只保存在本机 `.env`。
