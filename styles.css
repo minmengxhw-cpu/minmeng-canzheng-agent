@@ -3059,8 +3059,12 @@ a.bi-head:hover { color: var(--accent,#9c2b21); text-decoration: underline; }
   border-radius: 14px 14px 0 0;
 }
 
-.central-head .eyebrow,
-.central-head .scope-tag { color: rgba(255,255,255,.72); }
+.central-head .eyebrow { color: rgba(255,255,255,.72); }
+.central-head .scope-tag {
+  color: rgba(255,255,255,.86);
+  background: rgba(255,255,255,.12);
+  border-color: rgba(255,255,255,.28);
+}
 .central-head h2 { font-size: clamp(20px, 2.4vw, 26px); }
 
 .central-list {
