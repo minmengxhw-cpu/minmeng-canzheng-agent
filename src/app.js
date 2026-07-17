@@ -1624,6 +1624,51 @@ function bindEvents() {
 // 动向速递已彻底移除（首屏直接是领导主要活动卡片，不再有当日摘要行）
 async function renderBrief() { /* no-op：保留空函数避免 init 调用报错 */ }
 
+/* ============ 飞书扫码订阅 ============ */
+async function initSubscribe() {
+  const img = document.getElementById("subscribeQr");
+  const box = document.getElementById("subscribeQrBox");
+  const fallback = document.getElementById("subscribeFallback");
+  const linkWrap = document.getElementById("subscribeLinkWrap");
+  const link = document.getElementById("subscribeLink");
+  if (!img) return;
+
+  let meta = null;
+  try {
+    const r = await fetch("data/feishu_join.json", { cache: "no-store" });
+    if (r.ok) meta = await r.json();
+  } catch (_) {
+    meta = null;
+  }
+
+  const joinUrl = meta && meta.join_url;
+  if (joinUrl) {
+    if (link && linkWrap) {
+      link.href = joinUrl;
+      linkWrap.hidden = false;
+    }
+    if (fallback) fallback.hidden = true;
+    // 优先 SVG，失败再试 PNG
+    img.onerror = () => {
+      if (img.dataset.fallback !== "1") {
+        img.dataset.fallback = "1";
+        img.src = "assets/feishu_join_qr.png";
+      } else if (box) {
+        box.innerHTML =
+          '<p class="subscribe-qr-caption">二维码文件缺失，请使用下方链接加入</p>';
+      }
+    };
+    return;
+  }
+
+  if (fallback) fallback.hidden = false;
+  if (linkWrap) linkWrap.hidden = true;
+  if (box) {
+    box.innerHTML =
+      '<p class="subscribe-qr-caption">订阅群待管理员配置</p>';
+  }
+}
+
 function init() {
   renderThemeFilter();
   renderBrief();
@@ -1634,6 +1679,7 @@ function init() {
   renderSources();
   renderMeta();
   bindEvents();
+  initSubscribe();
 }
 
 init();

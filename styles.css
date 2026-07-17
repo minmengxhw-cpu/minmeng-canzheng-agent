@@ -1077,6 +1077,93 @@ p { margin: 0; }
   color: var(--accent);
 }
 
+/* ============ 飞书扫码订阅 ============ */
+.subscribe {
+  margin: 28px auto 8px;
+  max-width: 960px;
+  padding: 0 20px;
+}
+.subscribe-inner {
+  display: grid;
+  grid-template-columns: 1.4fr 0.8fr;
+  gap: 28px;
+  align-items: center;
+  background: linear-gradient(135deg, #1f3a5f 0%, #2b4f7c 55%, #1a3355 100%);
+  color: #f5f8fc;
+  border-radius: 18px;
+  padding: 28px 32px;
+  box-shadow: 0 12px 40px rgba(20, 40, 70, 0.18);
+}
+.subscribe-copy .eyebrow {
+  color: rgba(255, 255, 255, 0.72);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 12px;
+  margin: 0 0 8px;
+}
+.subscribe-copy h2 {
+  margin: 0 0 10px;
+  font-size: clamp(20px, 2.4vw, 26px);
+  color: #fff;
+}
+.subscribe-copy .lede {
+  margin: 0 0 14px;
+  color: rgba(255, 255, 255, 0.88);
+  line-height: 1.55;
+}
+.subscribe-steps {
+  margin: 0;
+  padding-left: 1.2em;
+  color: rgba(255, 255, 255, 0.86);
+  line-height: 1.7;
+  font-size: 14px;
+}
+.subscribe-fallback {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: rgba(255, 220, 180, 0.95);
+}
+.subscribe-fallback code {
+  background: rgba(0, 0, 0, 0.25);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.subscribe-link-wrap { margin: 14px 0 0; }
+.subscribe-link {
+  color: #9fd0ff;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.subscribe-qr {
+  justify-self: center;
+  text-align: center;
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px 16px 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+.subscribe-qr-img {
+  display: block;
+  width: 180px;
+  height: 180px;
+  margin: 0 auto;
+  object-fit: contain;
+}
+.subscribe-qr-caption {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #4a5568;
+}
+@media (max-width: 720px) {
+  .subscribe-inner {
+    grid-template-columns: 1fr;
+    padding: 22px 18px;
+  }
+  .subscribe-qr { justify-self: center; }
+}
+
 /* ============ Footer ============ */
 
 .page-footer {

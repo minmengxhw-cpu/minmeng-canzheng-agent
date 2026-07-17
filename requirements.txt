@@ -1,2 +1,5 @@
 requests>=2.31
 beautifulsoup4>=4.12
+qrcode>=7.4
+# 可选：生成 PNG 二维码
+# pillow>=10.0

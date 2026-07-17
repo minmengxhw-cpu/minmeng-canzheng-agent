@@ -50,3 +50,34 @@ bash scripts/install_launchd.sh
 之后每天 9 点 / 21 点：抓取 → 写数据 → **推飞书** → 有变化则 push 网站。
 
 默认：**有当日新增信号才推**；要「无新闻也推一句」时设 `FEISHU_PUSH_ALWAYS=1`。
+
+## 扫码订阅（给其他人）
+
+别人扫网页上的二维码 → 加入飞书群 → 自动收到机器人推送。
+
+### 管理员一次性配置
+
+1. 飞书建**推送群**（可设为公开/允许分享入群）  
+2. 把上面的**自定义机器人**加进这个群（Webhook 即 `FEISHU_WEBHOOK`）  
+3. 群设置 → **分享** → 复制 **邀请链接**（`applink.feishu.cn/...`）  
+4. 写入本地 `.env`：
+
+```bash
+echo 'FEISHU_JOIN_URL=https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=你的token' \
+  >> "$HOME/Library/Application Support/minmeng-canzheng-agent/.env"
+```
+
+5. 生成二维码并发布到网站：
+
+```bash
+cd "/path/to/minmeng-canzheng-agent"
+set -a && source "$HOME/Library/Application Support/minmeng-canzheng-agent/.env" && set +a
+python3 scripts/gen_feishu_join_qr.py
+git add assets/feishu_join_qr.svg assets/feishu_join_qr.png data/feishu_join.json
+git commit -m "docs: publish Feishu join QR for push subscribers"
+git push origin main
+```
+
+6. 打开网站底部 **「扫码加入，主动收消息」**，用手机飞书扫码验证。
+
+> 说明：二维码指向的是**群邀请链接**，不是 Webhook 密钥。Webhook 只保存在本机 `.env`，不要放进二维码。

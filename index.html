@@ -17,6 +17,7 @@
           <a href="#leaders">今日动向</a>
           <a href="#central">中央关注</a>
           <a href="#cuts">候选切口</a>
+          <a href="#subscribe">飞书订阅</a>
         </nav>
       </div>
     </header>
@@ -122,6 +123,42 @@
         </div>
       </section>
 
+      <!-- 扫码订阅飞书主动推送 -->
+      <section class="block subscribe" id="subscribe" aria-labelledby="subscribeTitle">
+        <div class="subscribe-inner">
+          <div class="subscribe-copy">
+            <p class="eyebrow">飞书推送</p>
+            <h2 id="subscribeTitle">扫码加入，主动收消息</h2>
+            <p class="lede">
+              用手机飞书扫描右侧二维码，加入推送群后，每日更新会<strong>主动推送到飞书</strong>，无需反复打开网页。
+            </p>
+            <ol class="subscribe-steps">
+              <li>打开手机 <strong>飞书 App</strong></li>
+              <li>扫一扫页面上的二维码（或点下方链接）</li>
+              <li>加入群后保持通知开启</li>
+            </ol>
+            <p class="subscribe-fallback" id="subscribeFallback" hidden>
+              订阅群尚未配置。管理员请在本机设置 <code>FEISHU_JOIN_URL</code> 后运行
+              <code>python3 scripts/gen_feishu_join_qr.py</code>。
+            </p>
+            <p class="subscribe-link-wrap" id="subscribeLinkWrap" hidden>
+              <a id="subscribeLink" class="subscribe-link" href="#" target="_blank" rel="noopener">打不开扫码时，点此加入飞书群</a>
+            </p>
+          </div>
+          <div class="subscribe-qr" id="subscribeQrBox">
+            <img
+              id="subscribeQr"
+              class="subscribe-qr-img"
+              src="assets/feishu_join_qr.svg"
+              alt="飞书推送群二维码"
+              width="200"
+              height="200"
+            />
+            <p class="subscribe-qr-caption">飞书扫码加入</p>
+          </div>
+        </div>
+      </section>
+
       <footer class="page-footer">
         <div class="footer-inner">
           <p class="footer-brand">CZ Agent</p>
@@ -130,7 +167,7 @@
             <span class="dot">·</span>
             <span id="metaTopics"></span>
           </p>
-          <p class="footer-note">每日 09:00 + 21:00 更新 · 同步全国中央考察与上海领导动态 · 所有解读均需回看原文</p>
+          <p class="footer-note">每日 09:00 + 21:00 更新 · 同步全国中央考察与上海领导动态 · 所有解读均需回看原文 · <a href="#subscribe">飞书扫码订阅</a></p>
         </div>
       </footer>
     </main>
