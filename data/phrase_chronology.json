@@ -1399,10 +1399,11 @@
     "first_occasion": "上海代表团审议政府工作报告",
     "first_title": "",
     "first_url": "https://www.shanghai.gov.cn/nw4411/20250306/bd491b22150c4e318f425e222de5b1fc.html",
-    "count": 8,
+    "count": 9,
     "themes": [
       "城市治理",
-      "开放发展"
+      "开放发展",
+      "科技产业"
     ]
   },
   {
@@ -19608,7 +19609,7 @@
     "first_occasion": "市委常委会扩大会议",
     "first_title": "",
     "first_url": "https://www.shanghai.gov.cn/nw4411/20260721/e609ce33b2a74ed9b698819fe1622edd.html",
-    "count": 2,
+    "count": 4,
     "themes": [
       "民生治理",
       "科技产业"
@@ -19622,7 +19623,7 @@
     "first_occasion": "市委常委会扩大会议",
     "first_title": "",
     "first_url": "https://www.shanghai.gov.cn/nw4411/20260721/e609ce33b2a74ed9b698819fe1622edd.html",
-    "count": 1,
+    "count": 2,
     "themes": [
       "科技产业"
     ]
@@ -20158,6 +20159,84 @@
     "count": 1,
     "themes": [
       "开放发展"
+    ]
+  },
+  {
+    "phrase": "深化递进抓落实、务求必成抓落实",
+    "first_date": "2026-07-25",
+    "first_role": "市委书记",
+    "first_theme": "科技产业",
+    "first_occasion": "市委九届九次全会",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260725/9b0a0b7e671e465bad3771f0f2f7b281.html",
+    "count": 1,
+    "themes": [
+      "科技产业"
+    ]
+  },
+  {
+    "phrase": "城市治理模型和智能体应用",
+    "first_date": "2026-07-25",
+    "first_role": "市委书记",
+    "first_theme": "科技产业",
+    "first_occasion": "市委九届九次全会",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260725/9b0a0b7e671e465bad3771f0f2f7b281.html",
+    "count": 1,
+    "themes": [
+      "科技产业"
+    ]
+  },
+  {
+    "phrase": "鼓足干劲、奋力一跳",
+    "first_date": "2026-07-25",
+    "first_role": "市委书记",
+    "first_theme": "科技产业",
+    "first_occasion": "市委九届九次全会",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260725/9b0a0b7e671e465bad3771f0f2f7b281.html",
+    "count": 1,
+    "themes": [
+      "科技产业"
+    ]
+  },
+  {
+    "phrase": "以孜孜以求的不懈奋斗践行殷殷嘱托",
+    "first_date": "2026-07-25",
+    "first_role": "市委书记",
+    "first_theme": "科技产业",
+    "first_occasion": "十二届市委九次全会",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260725/0103b6602238454c8a885e60a5d3cb2c.html",
+    "count": 1,
+    "themes": [
+      "科技产业"
+    ]
+  },
+  {
+    "phrase": "自主创新、应用牵引、生态协同、开放共赢、安全可控",
+    "first_date": "2026-07-25",
+    "first_role": "市委书记",
+    "first_theme": "科技产业",
+    "first_occasion": "十二届市委九次全会",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260725/0103b6602238454c8a885e60a5d3cb2c.html",
+    "count": 1,
+    "themes": [
+      "科技产业"
+    ]
+  },
+  {
+    "phrase": "以自身努力的确定性对冲外部环境的不确定性",
+    "first_date": "2026-07-25",
+    "first_role": "市委书记",
+    "first_theme": "科技产业",
+    "first_occasion": "十二届市委九次全会",
+    "first_title": "",
+    "first_url": "https://www.shanghai.gov.cn/nw4411/20260725/0103b6602238454c8a885e60a5d3cb2c.html",
+    "count": 1,
+    "themes": [
+      "科技产业"
     ]
   }
 ]
