@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """独立抓取中央领导在全国的公开考察调研与重要要求。
 
-本通道与市委主要领导数据分开存储、分开统计，只对新来源 URL 调用 Grok CLI。
+本通道与市委主要领导数据分开存储、分开统计，只对新来源 URL 调用 MiniMax CLI。
 公开页面中的具体身份统一在站内显示为“中央领导”，保留原文链接供追溯。
 """
 
@@ -29,7 +29,7 @@ from fetch_leaders import (
     fetch_shio_push_list,
     parse_list,
 )
-from grok_cli import grok_json
+from minimax_cli import minimax_json
 import requests
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -235,7 +235,7 @@ def analyze(date: str, headline: str, full_text: str) -> Dict[str, Any]:
         aliases = sorted(set(re.findall(
             r"([\u4e00-\u9fff]{2,4})(?:总书记|国家主席)", full_text
         )))
-        return clean_result(grok_json(SYSTEM_PROMPT, prompt, max_tokens=1100, temperature=0.2), aliases)
+        return clean_result(minimax_json(SYSTEM_PROMPT, prompt, max_tokens=1100, temperature=0.2), aliases)
     except Exception as exc:
         log(f"模型分析失败：{exc}")
         return {}
@@ -357,7 +357,7 @@ def main() -> int:
                      else fetch_official_detail(item["url"]))
         if not full_text or not likely_detail(full_text):
             continue
-        log(f"  Grok 分析：{item['date']} · {headline}")
+        log(f"  MiniMax 分析：{item['date']} · {headline}")
         analysis = analyze(item["date"], headline, full_text)
         if not analysis:
             continue

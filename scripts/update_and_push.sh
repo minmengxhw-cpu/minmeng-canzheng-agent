@@ -25,8 +25,7 @@ git fetch origin main
 git merge --ff-only origin/main
 
 SINCE="$(date -v-7d +%F)"
-GROK_MODEL="${GROK_MODEL:-grok-4.5}" \
-GROK_PERMISSION_MODE="${GROK_PERMISSION_MODE:-bypassPermissions}" \
+MINIMAX_MODEL="${MINIMAX_MODEL:-MiniMax-M3}" \
   python3 scripts/update_all.py --since "$SINCE" --max-pages 6 --skip-drafts
 
 # 无 git 变化时仍生成/推送简报（避免「有信号但未 commit」漏推）
