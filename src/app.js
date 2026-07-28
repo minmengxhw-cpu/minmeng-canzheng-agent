@@ -56,6 +56,8 @@ const els = {
   centralStat: $("#centralStat"),
   focusGrid: $("#focusGrid"),
   focusEyebrow: $("#focusEyebrow"),
+  directionGrid: $("#directionGrid"),
+  directionEyebrow: $("#directionEyebrow"),
   cutGrid: $("#cutGrid"),
   cutSearch: $("#cutSearch"),
   signalList: $("#signalList"),
@@ -235,6 +237,7 @@ async function renderLeaders() {
   if (cuts.length) state.selectedTopicId = cuts[0].id;
   // 数据就绪后重渲染依赖此数据的模块
   renderFocus();
+  renderLeadershipDirections();
   renderCuts();
   renderWorkbench();
   renderThemeFilter();
@@ -261,10 +264,16 @@ function renderCentralSignals() {
     els.centralStat.textContent = items.length ? `共 ${items.length} 条 · 最近 ${items[0].date}` : "暂无记录";
   }
   if (!items.length) {
+    document.getElementById("central")?.classList.remove("is-quiet");
     els.centralList.innerHTML = `<p class="empty-tip">近期暂无新增记录；通道仍按计划巡检权威来源。</p>`;
     return;
   }
   const item = items[0];
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const baselineDate = [state.leaderItems[0]?.date, today, item.date].filter(Boolean).sort().pop();
+  const quiet = lifeDays(item.date, baselineDate) > 7;
+  document.getElementById("central")?.classList.toggle("is-quiet", quiet);
   const points = (item.directives || item.key_points || []).slice(0, 3);
   const newPhrases = (item.new_phrasing || []).slice(0, 4);
   const policies = Array.isArray(item.policy_implications)
@@ -278,7 +287,7 @@ function renderCentralSignals() {
     : `<span>${escapeHtml(src.name)}</span>`).join("");
   const older = items.slice(1);
 
-  els.centralList.innerHTML = `
+  const fullCard = `
     <article class="central-card">
       <div class="central-card-meta">
         <span>${escapeHtml(item.date)} · ${escapeHtml(item.verification_status || "权威来源已核验")}</span>
@@ -296,6 +305,170 @@ function renderCentralSignals() {
       <div class="central-source-row"><span>核验来源</span>${sourceLinks}</div>
       ${older.length ? `<details class="central-history"><summary>查看历史记录 · ${older.length} 条</summary><ol>${older.map((x) => `<li><span>${escapeHtml(x.date)}</span>${x.url ? `<a href="${escapeHtml(x.url)}" target="_blank" rel="noreferrer">${escapeHtml(x.headline)}</a>` : escapeHtml(x.headline)}</li>`).join("")}</ol></details>` : ""}
     </article>`;
+  if (quiet) {
+    if (els.centralStat) els.centralStat.textContent = `低频追踪 · 最近 ${item.date}`;
+    els.centralList.innerHTML = `
+      <details class="central-quiet">
+        <summary>
+          <span class="central-quiet-date">${escapeHtml(item.date)}</span>
+          <strong>${escapeHtml(item.headline || "重要考察调研与工作要求")}</strong>
+          <span class="central-quiet-action">展开查看</span>
+        </summary>
+        <div class="central-quiet-body">${fullCard}</div>
+      </details>`;
+  } else {
+    els.centralList.innerHTML = fullCard;
+  }
+}
+
+/* ============ 本周讲话方向：近 7 天对比前 30 天 ============ */
+
+const DIRECTION_META = {
+  "科技产业": {
+    title: "科技创新与产业治理",
+    cut: "场景开放、评测规则、数据治理与成果转化",
+  },
+  "城市治理": {
+    title: "超大城市治理现代化",
+    cut: "基层减负、风险闭环、物业协同与数字治理",
+  },
+  "民生治理": {
+    title: "民生改革与公共服务",
+    cut: "一老一小、社区服务、成本分担与效果评价",
+  },
+  "开放发展": {
+    title: "开放枢纽与国际竞争力",
+    cut: "企业出海、专业服务、跨境规则与资源配置",
+  },
+  "营商环境": {
+    title: "营商环境与企业服务",
+    cut: "政策可达、监管协同、融资服务与企业获得感",
+  },
+  "文化教育": {
+    title: "文化教育与人才发展",
+    cut: "人才评价、教育供给、文化传播与公共服务",
+  },
+  "生态环境": {
+    title: "绿色转型与韧性城市",
+    cut: "减污降碳、基础设施韧性与治理成本",
+  },
+  "法治建设": {
+    title: "法治保障与治理规范",
+    cut: "制度衔接、执法协同、公开透明与权益保障",
+  },
+};
+
+function directionRoleNote(secretaryCount, mayorCount) {
+  if (secretaryCount && mayorCount) return "战略部署与落实机制形成联动";
+  if (secretaryCount) return "当前以战略判断和工作要求为主";
+  if (mayorCount) return "当前以落实机制和资源配置为主";
+  return "持续观察后续部署和落实动作";
+}
+
+function directionStatus(currentCount, previousCount) {
+  const weeklyBaseline = previousCount / 4;
+  if (!previousCount) return { key: "new", label: "新进入", symbol: "＋" };
+  if (currentCount >= Math.max(2, weeklyBaseline * 1.4)) {
+    return { key: "up", label: "明显强化", symbol: "↑" };
+  }
+  if (currentCount < weeklyBaseline * 0.55) {
+    return { key: "down", label: "有所降温", symbol: "↓" };
+  }
+  return { key: "steady", label: "持续推进", symbol: "→" };
+}
+
+function renderLeadershipDirections() {
+  if (!els.directionGrid) return;
+  const all = state.leaderItems || [];
+  if (!all.length) {
+    els.directionGrid.innerHTML = `<p class="empty-tip">暂无可归纳的讲话方向。</p>`;
+    return;
+  }
+
+  const newest = all[0].date;
+  const recentCutoff = dateMinus(newest, 6);
+  const previousCutoff = dateMinus(newest, 36);
+  const recent = all.filter((s) => s.date >= recentCutoff);
+  const previous = all.filter((s) => s.date >= previousCutoff && s.date < recentCutoff);
+  const grouped = {};
+
+  recent.forEach((s) => {
+    const theme = s.theme || "城市治理";
+    if (!grouped[theme]) {
+      grouped[theme] = {
+        theme,
+        items: [],
+        phrases: new Map(),
+        secretaryCount: 0,
+        mayorCount: 0,
+        score: 0,
+      };
+    }
+    const row = grouped[theme];
+    row.items.push(s);
+    const isSecretary = s.role === "市委书记" || s.leader === "陈吉宁";
+    if (isSecretary) row.secretaryCount += 1;
+    else row.mayorCount += 1;
+    row.score += isSecretary ? 8 : 5;
+    if (/全会|常委会|动员|部署|推进会/.test(`${s.occasion || ""}${s.headline || ""}`)) row.score += 5;
+    (s.new_phrasing || []).forEach((p) => {
+      const phrase = String(p || "").trim();
+      if (!phrase) return;
+      row.phrases.set(phrase, (row.phrases.get(phrase) || 0) + 1);
+      row.score += (state.phraseCounts[phrase] || 1) >= 2 ? 4 : 2;
+    });
+  });
+
+  const previousCounts = previous.reduce((acc, s) => {
+    const theme = s.theme || "城市治理";
+    acc[theme] = (acc[theme] || 0) + 1;
+    return acc;
+  }, {});
+
+  const rows = Object.values(grouped)
+    .map((row) => {
+      const status = directionStatus(row.items.length, previousCounts[row.theme] || 0);
+      const phrases = [...row.phrases.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 2)
+        .map(([phrase]) => phrase);
+      return { ...row, status, phrases, meta: DIRECTION_META[row.theme] || {
+        title: row.theme,
+        cut: "围绕落实机制、执行堵点和效果评价开展调研",
+      }};
+    })
+    .sort((a, b) => b.score - a.score || b.items.length - a.items.length)
+    .slice(0, 3);
+
+  if (els.directionEyebrow) {
+    els.directionEyebrow.textContent = `近 7 天 · ${recentCutoff.slice(5).replace("-", "/")}—${newest.slice(5).replace("-", "/")}`;
+  }
+
+  els.directionGrid.innerHTML = rows.map((row, index) => {
+    const evidenceLinks = row.items
+      .filter((item) => item.url)
+      .slice(0, 2)
+      .map((item, sourceIndex) => `<a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">原文 ${sourceIndex + 1}</a>`)
+      .join("");
+    const phraseText = row.phrases.length
+      ? row.phrases.join("；")
+      : "延续既有表述，等待新的明确提法";
+    return `
+      <article class="direction-card">
+        <div class="direction-card-top">
+          <span class="direction-rank">${String(index + 1).padStart(2, "0")}</span>
+          <span class="direction-status is-${row.status.key}">${row.status.label} ${row.status.symbol}</span>
+        </div>
+        <h3>${escapeHtml(row.meta.title)}</h3>
+        <p class="direction-judgement">${escapeHtml(phraseText)}</p>
+        <p class="direction-role">${escapeHtml(directionRoleNote(row.secretaryCount, row.mayorCount))} · 本周 ${row.items.length} 次</p>
+        <div class="direction-cut">
+          <span>民盟观察</span>
+          <p>${escapeHtml(row.meta.cut)}</p>
+        </div>
+        ${evidenceLinks ? `<div class="direction-sources">${evidenceLinks}</div>` : ""}
+      </article>`;
+  }).join("");
 }
 
 /* ============ 提法生命周期 ============ */
@@ -657,9 +830,8 @@ function renderPhraseCloud() {
     `;
   }).join("");
 
-  const opened = window.matchMedia("(min-width: 841px)").matches ? " open" : "";
   target.innerHTML = `
-    <details class="phrase-side"${opened}>
+    <details class="phrase-side">
       <summary class="phrase-side-head">
         <span class="phrase-side-eyebrow">近期新提法</span>
         <span class="phrase-side-sub">书记 ${secN} 条 · 市长 ${mayN} 条 / 共 ${phrases.length} 条</span>
@@ -667,6 +839,8 @@ function renderPhraseCloud() {
       <ol class="phrase-side-list">${listHtml}</ol>
     </details>
   `;
+  const panel = target.querySelector(".phrase-side");
+  if (panel) panel.open = window.matchMedia("(min-width: 841px)").matches;
 }
 
 function renderLeaderFilters() {
@@ -995,17 +1169,16 @@ function renderFocus() {
   top3.forEach((sig, idx) => {
     const card = document.createElement("article");
     card.className = "focus-card";
-    card.tabIndex = 0;
     const roleShort = (sig.role === "市委书记" || sig.leader === "陈吉宁") ? "书记" : "市长";
     const dateShort = (sig.date || "").slice(5).replace("-", "/");
     const np = sig.new_phrasing || [];
     // 找出 反复 ≥2 次的提法（"已立住的"）
     const repeatedPhrases = np.filter((p) => (state.phraseCounts[(p||"").trim()] || 0) >= 2);
-    const newPhrases = np.filter((p) => (state.phraseCounts[(p||"").trim()] || 0) < 2).slice(0, 2);
+    const newPhrases = np.filter((p) => (state.phraseCounts[(p||"").trim()] || 0) < 2).slice(0, 1);
 
     const phraseSection = (repeatedPhrases.length || newPhrases.length) ? `
       <ul class="focus-phrases">
-        ${repeatedPhrases.slice(0,2).map((p) => `
+        ${repeatedPhrases.slice(0,1).map((p) => `
           <li class="phrase-repeat">
             <span class="phrase-tag">已立住 ${state.phraseCounts[p.trim()]}×</span>
             <span class="phrase-text">${p}</span>
@@ -1038,17 +1211,10 @@ function renderFocus() {
       ` : ""}
       <div class="focus-meta-bot">
         <span class="score-chip">关注度 ${sig._score}</span>
+        <a href="#weekly" class="focus-jump">查看一周讲话 ↓</a>
         ${sig.url ? `<a href="${sig.url}" target="_blank" rel="noreferrer" class="focus-link">查看来源 →</a>` : ""}
       </div>
     `;
-    // 点击/回车：滚到时间轴近一周区
-    const scrollToTimeline = () => {
-      document.getElementById("weekly")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    };
-    card.addEventListener("click", scrollToTimeline);
-    card.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); scrollToTimeline(); }
-    });
     els.focusGrid.append(card);
   });
 }
