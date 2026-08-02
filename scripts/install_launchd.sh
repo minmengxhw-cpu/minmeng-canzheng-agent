@@ -85,4 +85,4 @@ launchctl bootout "gui/$(id -u)" "$PLIST" 2>/dev/null || true
 launchctl bootout "gui/$(id -u)" "$CENTRAL_PLIST" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
 echo "旧 central-watch 任务已停用，原 plist 文件保留不删除"
-echo "已安装：每天 08:30/20:30 更新全国中央考察与上海领导动态（MiniMax CLI · MiniMax-M3）"
+echo "已安装：每天 08:30/20:30 由 MiniMax（mmx · MiniMax-M3）执行抓取分析，并推送外部飞书群"
