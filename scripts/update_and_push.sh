@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 日更入口（launchd 08:30 / 20:30）
+# 日更入口（launchd 仅 08:30，不发晚报）
 # 分析统一由 MiniMax CLI（mmx · MiniMax-M3）执行；简报规则拼装后推外部飞书群。
 set -euo pipefail
 
@@ -39,7 +39,7 @@ fi
 echo "执行引擎: MiniMax CLI=$MINIMAX_CLI  model=$MINIMAX_MODEL"
 "$MINIMAX_CLI" --version 2>/dev/null | head -n 1 || true
 
-# 运行副本常被 install_launchd rsync 弄脏 scripts/，会阻断 merge 导致整晚失败、晚报漏发
+# 运行副本常被 install_launchd rsync 弄脏 scripts/，会阻断 merge 导致整链失败、简报漏发
 git fetch origin main
 if ! git merge --ff-only origin/main; then
   echo "WARN: git merge --ff-only 失败，对齐 origin/main 后继续（避免漏推飞书）"
@@ -55,7 +55,7 @@ MINIMAX_MODEL="$MINIMAX_MODEL" \
 MINIMAX_TIMEOUT="$MINIMAX_TIMEOUT" \
   python3 scripts/update_all.py --since "$SINCE" --max-pages 6 --skip-drafts
 
-# 简报生成与飞书推送已在 update_all.py → gen_brief.py 完成，勿再调一次，否则早晚各推两条
+# 简报生成与飞书推送已在 update_all.py → gen_brief.py 完成，勿再调一次，否则会重复推送
 
 git add data/*.json briefs/*.md
 if git diff --cached --quiet; then

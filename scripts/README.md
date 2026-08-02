@@ -4,7 +4,7 @@
 
 ## 日更怎么跑（由 MiniMax 执行）
 
-本机 `launchd` 每天北京时间 **08:30 / 20:30** 调用 `scripts/update_and_push.sh`：
+本机 `launchd` 每天北京时间 **08:30** 调用 `scripts/update_and_push.sh`（仅早报，不发晚报）：
 
 1. **MiniMax CLI（`mmx` · MiniMax-M3）** 分析中央 + 上海公开活动  
 2. `gen_brief.py` 拼装政务体简报并推送到**外部飞书群**  
