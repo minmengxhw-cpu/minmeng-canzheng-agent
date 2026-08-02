@@ -65,8 +65,8 @@ data = {
     ],
     "EnvironmentVariables": common_env,
     "StartCalendarInterval": [
-        {"Hour": 9, "Minute": 0},
-        {"Hour": 21, "Minute": 0},
+        {"Hour": 8, "Minute": 30},
+        {"Hour": 20, "Minute": 30},
     ],
     "StandardOutPath": str(log_dir / "launchd.out.log"),
     "StandardErrorPath": str(log_dir / "launchd.err.log"),
@@ -85,4 +85,4 @@ launchctl bootout "gui/$(id -u)" "$PLIST" 2>/dev/null || true
 launchctl bootout "gui/$(id -u)" "$CENTRAL_PLIST" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
 echo "旧 central-watch 任务已停用，原 plist 文件保留不删除"
-echo "已安装：每天 09:00/21:00 更新全国中央考察与上海领导动态（MiniMax CLI · MiniMax-M3）"
+echo "已安装：每天 08:30/20:30 更新全国中央考察与上海领导动态（MiniMax CLI · MiniMax-M3）"

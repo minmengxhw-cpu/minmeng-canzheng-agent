@@ -17,7 +17,7 @@
           <a href="#leaders">今日动向</a>
           <a href="#central">中央关注</a>
           <a href="#cuts">候选切口</a>
-          <a href="#subscribe">飞书订阅</a>
+          <a href="#subscribe">飞书推送</a>
         </nav>
       </div>
     </header>
@@ -135,38 +135,29 @@
         </div>
       </section>
 
-      <!-- 扫码订阅飞书主动推送 -->
+      <!-- 飞书推送说明：不再公开展示入群二维码，由群主邀请加入外部群 -->
       <section class="block subscribe" id="subscribe" aria-labelledby="subscribeTitle">
         <div class="subscribe-inner">
           <div class="subscribe-copy">
             <p class="eyebrow">飞书推送</p>
-            <h2 id="subscribeTitle">扫码加入，主动收消息</h2>
+            <h2 id="subscribeTitle">日更简报推送说明</h2>
             <p class="lede">
-              用手机飞书扫描右侧二维码，加入推送群后，每日更新会<strong>主动推送到飞书</strong>，无需反复打开网页。
+              每日 <strong>08:30 / 20:30</strong> 将「参政议政动态简报」推送至指定<strong>外部飞书群</strong>。
+              入群请联系群主邀请；本站不再提供公开扫码入口。
             </p>
             <ol class="subscribe-steps">
-              <li>打开手机 <strong>飞书 App</strong></li>
-              <li>扫一扫页面上的二维码（或点下方链接）</li>
-              <li>加入群后保持通知开启</li>
+              <li>由群主将成员邀请入外部推送群</li>
+              <li>保持飞书通知开启，即可接收早报 / 晚报</li>
+              <li>内容依据公开报道整理，具体表述以原文为准</li>
             </ol>
-            <p class="subscribe-fallback" id="subscribeFallback" hidden>
-              订阅群尚未配置。管理员请在本机设置 <code>FEISHU_JOIN_URL</code> 后运行
-              <code>python3 scripts/gen_feishu_join_qr.py</code>。
-            </p>
+            <p class="subscribe-fallback" id="subscribeFallback" hidden></p>
             <p class="subscribe-link-wrap" id="subscribeLinkWrap" hidden>
-              <a id="subscribeLink" class="subscribe-link" href="#" target="_blank" rel="noopener">打不开扫码时，点此加入飞书群</a>
+              <a id="subscribeLink" class="subscribe-link" href="#" target="_blank" rel="noopener"></a>
             </p>
           </div>
-          <div class="subscribe-qr" id="subscribeQrBox">
-            <img
-              id="subscribeQr"
-              class="subscribe-qr-img"
-              src="assets/feishu_join_qr.svg"
-              alt="飞书推送群二维码"
-              width="200"
-              height="200"
-            />
-            <p class="subscribe-qr-caption">飞书扫码加入</p>
+          <div class="subscribe-qr" id="subscribeQrBox" hidden>
+            <img id="subscribeQr" class="subscribe-qr-img" alt="" width="200" height="200" hidden />
+            <p class="subscribe-qr-caption">订阅采用邀请制</p>
           </div>
         </div>
       </section>
@@ -179,7 +170,7 @@
             <span class="dot">·</span>
             <span id="metaTopics"></span>
           </p>
-          <p class="footer-note">每日 09:00 + 21:00 更新 · 同步全国中央考察与上海领导动态 · 所有解读均需回看原文 · <a href="#subscribe">飞书扫码订阅</a></p>
+          <p class="footer-note">每日 08:30 + 20:30 更新 · 中央与上海公开要情 · 解读须回看原文 · <a href="#subscribe">飞书推送说明</a></p>
         </div>
       </footer>
     </main>

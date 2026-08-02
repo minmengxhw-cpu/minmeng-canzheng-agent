@@ -28,12 +28,11 @@ SINCE="$(date -v-7d +%F)"
 MINIMAX_MODEL="${MINIMAX_MODEL:-MiniMax-M3}" \
   python3 scripts/update_all.py --since "$SINCE" --max-pages 6 --skip-drafts
 
-# 无 git 变化时仍生成/推送简报（避免「有信号但未 commit」漏推）
-python3 scripts/gen_brief.py || true
+# 简报生成与飞书推送已在 update_all.py → gen_brief.py 完成，勿再调一次，否则早晚各推两条
 
 git add data/*.json briefs/*.md
 if git diff --cached --quiet; then
-  echo "没有新的数据变化（简报/推送已尝试）"
+  echo "没有新的数据变化（简报/推送已在流水线内完成）"
   exit 0
 fi
 

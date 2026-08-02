@@ -4,7 +4,7 @@
 
 网站：<https://minmengxhw-cpu.github.io/minmeng-canzheng-agent/>
 
-数据每天北京时间 **09:00** 和 **21:00** 自动更新（本机 launchd）。
+数据每天北京时间 **08:30** 和 **20:30** 自动更新（本机 launchd），并推送 1 分钟可读的市委领导动向简报。
 
 ## 飞书主动推送到手机
 

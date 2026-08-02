@@ -164,12 +164,13 @@ def _format_markdown(
     lines: Optional[list] = None,
     site_url: str = "",
 ) -> str:
-    parts: List[str] = [f"**{title}**", "", summary]
+    # summary 可为多段简报正文；若已含网页链接则不再追加
+    parts: List[str] = [f"**{title}**", "", summary.strip()]
     if lines:
         parts.append("")
         for x in lines[:8]:
             parts.append(f"- {x}")
-    if site_url:
+    if site_url and "打开网页" not in summary and site_url not in summary:
         parts.append("")
         parts.append(f"[打开网页]({site_url})")
     return "\n".join(parts)

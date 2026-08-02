@@ -1,7 +1,8 @@
 {
-  "join_url": "https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=126q05af-a1e9-4376-a48b-7710e39d5aff",
-  "generated_at": "2026-07-17 15:24",
-  "qr_svg": "assets/feishu_join_qr.svg",
+  "join_url": "",
+  "generated_at": "2026-08-02",
+  "qr_svg": "",
   "qr_png": "",
-  "hint": "扫码加入飞书群后，将通过群机器人主动收到动向速递"
+  "hint": "旧公开扫码已撤除。订阅请由群主邀请加入外部推送群，本站不再提供公开入群链接。",
+  "disabled": true
 }
