@@ -39,8 +39,14 @@ fi
 echo "执行引擎: MiniMax CLI=$MINIMAX_CLI  model=$MINIMAX_MODEL"
 "$MINIMAX_CLI" --version 2>/dev/null | head -n 1 || true
 
+# 运行副本常被 install_launchd rsync 弄脏 scripts/，会阻断 merge 导致整晚失败、晚报漏发
 git fetch origin main
-git merge --ff-only origin/main
+if ! git merge --ff-only origin/main; then
+  echo "WARN: git merge --ff-only 失败，对齐 origin/main 后继续（避免漏推飞书）"
+  # 丢弃运行目录脏改动；本流水线会重新生成 data/
+  git reset --hard origin/main
+  git clean -fd --exclude=data/logs --exclude=.env --exclude='.env.*' || true
+fi
 
 SINCE="$(date -v-7d +%F)"
 echo "开始流水线（MiniMax 分析 → 简报 → 飞书外部群） since=$SINCE"
