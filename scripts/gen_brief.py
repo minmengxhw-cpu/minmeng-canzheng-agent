@@ -748,6 +748,31 @@ def _period_label() -> str:
     return "晚报"
 
 
+def _issue_no(ymd: str, period: str) -> str:
+    """按报告日生成期号：〔2026〕第212期·早
+
+    以年日内序为主；早/晚区分同日两报，便于归档检索。
+    """
+    try:
+        y, m, d = map(int, ymd.split("-"))
+        doy = datetime.date(y, m, d).timetuple().tm_yday
+    except Exception:
+        y = datetime.date.today().year
+        doy = datetime.date.today().timetuple().tm_yday
+    tag = {"早报": "早", "午报": "午", "晚报": "晚"}.get(period, "刊")
+    return f"〔{y}〕第{doy}期·{tag}"
+
+
+def _brief_heading(maxd: str) -> Tuple[str, str, str]:
+    """返回 (卡片标题, 正文刊头, 期号)。"""
+    period = _period_label()
+    issue = _issue_no(maxd, period)
+    date_cn = _ymd_cn(maxd)
+    card_title = f"参政议政动态简报{issue}（{period}）"
+    body_head = f"**参政议政动态简报{issue}（{period}）**"
+    return card_title, body_head, issue
+
+
 def _item_title(it: dict) -> str:
     direction = it.get("direction") or ""
     title = direction.split("｜")[-1] if "｜" in direction else direction
@@ -843,6 +868,7 @@ def build_push_markdown(
     period = _period_label()
     date_cn = _ymd_cn(maxd)
     c_date_cn = _ymd_cn(central_date) if central_date else ""
+    _, body_head, issue = _brief_heading(maxd)
 
     def assemble(
         n_ckw: int,
@@ -856,8 +882,10 @@ def build_push_markdown(
         brief_max: int,
     ) -> str:
         lines: List[str] = [
-            f"**参政议政动态简报（{period}）**",
+            body_head,
+            f"期号：{issue}",
             f"报告日期：{date_cn}",
+            f"刊次：{period}",
             "",
             "**一、要情导读**",
             overview,
@@ -894,11 +922,14 @@ def build_push_markdown(
             brief_max=brief_max,
         )
         lines.append("**四、近七日上海主题观察**")
-        lines.append(hot_txt + "。" if hot_txt and not hot_txt.endswith("。") else (hot_txt or "暂无。"))
+        lines.append(
+            hot_txt + "。" if hot_txt and not str(hot_txt).endswith("。") else (hot_txt or "暂无。")
+        )
         lines.append("")
-        lines.append("（根据公开报道整理，仅供参阅；具体表述以原文为准。）")
+        lines.append("**【编校说明】**")
+        lines.append("本文稿依据公开报道整理，仅供参阅；具体表述与政策口径以权威原文为准。")
         if site:
-            lines.append(f"网页专栏：{site}")
+            lines.append(f"专栏网页：{site}")
         return "\n".join(lines).strip()
 
     plans = [
@@ -930,10 +961,14 @@ def build_archive_md(
     hot_txt: str,
     site: str,
 ) -> str:
+    period = _period_label()
+    issue = _issue_no(maxd, period)
     lines = [
-        f"# 参政议政动态简报（{_period_label()}）",
+        f"# 参政议政动态简报{issue}（{period}）",
         "",
+        f"**期号：** {issue}",
         f"**报告日期：** {_ymd_cn(maxd)}",
+        f"**刊次：** {period}",
         "",
         "## 一、要情导读",
         "",
@@ -1016,9 +1051,11 @@ def build_archive_md(
     lines.append(f"- 公开信号 {week_n} 条，新提法 {week_phrases} 条")
     lines.append(f"- 活跃主题：{hot_txt}")
     lines.append("")
-    lines.append("（根据公开报道整理，仅供参阅；具体表述以原文为准。）")
+    lines.append("## 编校说明")
     lines.append("")
-    lines.append(f"网页专栏：{site}")
+    lines.append("本文稿依据公开报道整理，仅供参阅；具体表述与政策口径以权威原文为准。")
+    lines.append("")
+    lines.append(f"专栏网页：{site}")
     return "\n".join(lines)
 
 
@@ -1129,7 +1166,7 @@ def main() -> None:
         if t and len(str(t)) <= 12:
             theme_cnt[t] = theme_cnt.get(t, 0) + 1
     hot = sorted(theme_cnt.items(), key=lambda x: -x[1])[:3]
-    hot_txt = "、".join(f"{t}({n})" for t, n in hot) if hot else "—"
+    hot_txt = "、".join(f"{t}（{n}）" for t, n in hot) if hot else "暂无突出主题"
 
     sh_signals = build_day_signals(sh_items, week_sh, hist=hist_all, chrono=chrono)
     central_signals = build_day_signals(
@@ -1160,11 +1197,12 @@ def main() -> None:
         hot_txt=hot_txt,
         site=site,
     )
-    period = _period_label()
-    title = f"参政议政动态简报（{period}）· {_ymd_cn(maxd)}"
+    title, _, issue = _brief_heading(maxd)
 
     brief = {
         "date": maxd,
+        "issue": issue,
+        "period": _period_label(),
         "generated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
         "summary": summary,
         "overview": overview,
