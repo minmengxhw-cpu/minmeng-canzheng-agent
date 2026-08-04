@@ -740,6 +740,9 @@ def _ymd_cn(ymd: str) -> str:
 
 
 def _period_label() -> str:
+    forced = os.environ.get("CZ_BRIEF_PERIOD", "").strip()
+    if forced in ("早报", "午报", "晚报"):
+        return forced
     hour = datetime.datetime.now().hour
     if hour < 12:
         return "早报"
