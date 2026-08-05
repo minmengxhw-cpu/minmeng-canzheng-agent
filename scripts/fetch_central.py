@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """独立抓取中央 / 最高层公开信号（考察调研、重要会议与指示）。
 
-本通道与市委主要领导数据分开存储、分开统计，只对新来源 URL 调用 Grok Build CLI。
+本通道与市委主要领导数据分开存储、分开统计，只对新来源 URL 调用 LLM
+（优先 MiniMax，额度不足回退 Grok Build）。
 公开页面中的具体身份统一在站内显示为“中央领导”，保留原文链接供追溯。
 
 轻量约束：
@@ -34,7 +35,7 @@ from fetch_leaders import (
     fetch_shio_push_list,
     parse_list,
 )
-from grok_cli import grok_json
+from llm_cli import llm_json
 import requests
 
 try:
@@ -511,7 +512,7 @@ def analyze(date: str, headline: str, full_text: str) -> Dict[str, Any]:
             r"([\u4e00-\u9fff]{2,4})(?:总书记|国家主席)", full_text
         )))
         result = clean_result(
-            grok_json(SYSTEM_PROMPT, prompt, max_tokens=1100, temperature=0.2),
+            llm_json(SYSTEM_PROMPT, prompt, max_tokens=1100, temperature=0.2),
             aliases,
         )
         if result and (result.get("summary") or result.get("key_points")):
@@ -676,7 +677,7 @@ def main() -> int:
             text_ok = ("政治局" in full_text[:2000] or "会议" in full_text[:800])
         if not text_ok:
             continue
-        log(f"  Grok 分析：{item['date']} · {headline} · {item.get('source')}")
+        log(f"  LLM 分析：{item['date']} · {headline} · {item.get('source')}")
         analysis = analyze(item["date"], headline, full_text)
         if not analysis:
             continue

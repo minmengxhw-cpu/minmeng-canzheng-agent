@@ -24,7 +24,7 @@
   python3 scripts/fetch_leaders.py                  # 默认回溯最近 180 天
   SINCE=2026-01-01 MAX_PAGES=120 python3 scripts/fetch_leaders.py   # 指定回溯
   ONLY_SECRETARY=1 python3 scripts/fetch_leaders.py # 只抓市委书记
-  # 分析引擎：Grok Build CLI（grok）
+  # 分析引擎：优先 MiniMax（mmx），额度不足回退 Grok Build（grok）
 """
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ except ImportError:
     print("缺依赖：pip install requests beautifulsoup4", file=sys.stderr)
     sys.exit(1)
 
-from grok_cli import grok_json
+from llm_cli import llm_json
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "data" / "leaders.json"
@@ -844,7 +844,7 @@ def analyze(headline: str, date: str, leader: str, full_text: str) -> Dict:
 }}"""
     for attempt in range(2):
         try:
-            result = grok_json(SYSTEM_PROMPT, user, max_tokens=1200, temperature=0.2)
+            result = llm_json(SYSTEM_PROMPT, user, max_tokens=1200, temperature=0.2)
             if result and (result.get("summary") or result.get("key_points")):
                 return result
         except Exception as e:

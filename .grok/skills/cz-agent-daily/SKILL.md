@@ -2,7 +2,7 @@
 name: cz-agent-daily
 description: >
   民盟参政议政雷达（minmeng-canzheng-agent）日更简报运维与排障 Skill。
-  负责：每日 08:30 仅推一次外部飞书群、Grok Build 分析流水线、政务体简报格式、
+  负责：每日 08:30 仅推一次外部飞书群、MiniMax 优先/Grok 回退分析流水线、政务体简报格式、
   禁止双推/旧群/晚报、检查 launchd 与 230035 发言权限。
   用户提到：简报、飞书推送、早报、晚报、漏发、发错群、定时任务、launchd、
   外部群、动向速递、CZ Agent、参政议政动态简报、检查今天有没有发、/cz-agent-daily
@@ -12,7 +12,7 @@ description: >
 # CZ Agent 日更简报（强制约束）
 
 **仓库：** `minmeng-canzheng-agent`  
-**目标：** 每天 **只** 在 **08:30** 向 **指定外部飞书群** 推送 **一份** 政务体简报，由 **Grok Build（grok）** 做分析，**绝不发错群、不双推、不发晚报**。
+**目标：** 每天 **只** 在 **08:30** 向 **指定外部飞书群** 推送 **一份** 政务体简报，由 **MiniMax 分析（额度不足回退 Grok Build）**，**绝不发错群、不双推、不发晚报**。
 
 ## 铁律（违反即错误）
 
@@ -32,9 +32,10 @@ description: >
    - **禁止**在 `update_and_push.sh` 末尾再调 `gen_brief.py`（历史双推根因）
 
 4. **执行引擎**  
-   - 分析：`grok` / Grok Build（`GROK_CLI`、`GROK_MODEL=grok-4.5`）  
+   - 分析主：`mmx` / MiniMax-M3（`MINIMAX_CLI`、`MINIMAX_MODEL`）  
+   - 分析回退：`grok` / Grok Build（额度不足或失败时，`LLM_ENGINE=auto`）  
    - 简报拼装：`gen_brief.py` 规则政务体（无省略号）  
-   - 模型失败：中央/上海均可规则兜底，但流水线仍须跑完并尽量推飞书
+   - 模型均失败：中央/上海均可规则兜底，流水线仍须跑完并尽量推飞书
 
 5. **改配置后必须**  
    ```bash
@@ -66,11 +67,11 @@ FEISHU_SITE_URL=https://minmengxhw-cpu.github.io/minmeng-canzheng-agent/
 ```
 launchd 08:30
   → update_and_push.sh
-      → 校验 grok（Grok Build）
+      → 校验 mmx（主）+ grok（回退）
       → git fetch + merge（失败则 hard reset origin/main，避免脏 scripts 漏发）
       → update_all.py
-            → fetch_central.py   # Grok / 规则兜底
-            → fetch_leaders.py   # Grok / 规则兜底
+            → fetch_central.py   # MiniMax→Grok / 规则兜底
+            → fetch_leaders.py   # MiniMax→Grok / 规则兜底
             → gen_brief.py       # 唯一推送点 → 外部群
             → gen_cuts.py
       → 有数据变化则 git commit/push
@@ -106,7 +107,7 @@ bash scripts/check_daily_health.sh
 4. 外部群 `moderation_setting=all_members`（否则 230035）  
 5. 机器人在群内  
 6. 今日 08:30 日志有开始与「已主动推送」  
-7. `grok` 可执行  
+7. `mmx` 或 `grok` 至少其一可执行
 
 **任一失败 → 先修再推送，禁止盲目改 chat_id。**
 
@@ -144,9 +145,9 @@ bash scripts/install_launchd.sh
 
 查是否 `update_and_push.sh` 又调用了第二次 `gen_brief.py` → **删掉第二次调用**。
 
-### E. Grok 分析失败
+### E. MiniMax 额度不足
 
-分析可能失败/走规则兜底；仍应生成简报并推送。检查 `grok --version` 与登录态。
+自动回退 Grok Build；两者都失败则规则兜底。仍应生成简报并推送。可查 `mmx quota show` / `grok --version`。
 
 ### F. 漏发今日早报（补发）
 

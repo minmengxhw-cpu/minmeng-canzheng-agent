@@ -85,13 +85,23 @@ if grep -qE '^FEISHU_WEBHOOK=' "$ENVF" 2>/dev/null && ! grep -qE '^#.*FEISHU_WEB
   fi
 fi
 
-# 4) Grok Build CLI
-echo "[4] Grok Build CLI"
+# 4) 分析引擎：MiniMax 主 + Grok 回退
+echo "[4] 分析引擎（MiniMax → Grok）"
+MMX="${MINIMAX_CLI:-/opt/homebrew/bin/mmx}"
 GROK="${GROK_CLI:-$HOME/.grok/bin/grok}"
-if [[ -x "$GROK" ]] || command -v grok >/dev/null 2>&1; then
-  ok "grok 可执行 (${GROK:-$(command -v grok)})"
+if [[ -x "$MMX" ]] || command -v mmx >/dev/null 2>&1; then
+  ok "MiniMax mmx 可执行 (${MMX:-$(command -v mmx)})"
 else
-  bad "找不到 grok — 分析链路会失败"
+  wrn "找不到 mmx — 将依赖 Grok 回退"
+fi
+if [[ -x "$GROK" ]] || command -v grok >/dev/null 2>&1; then
+  ok "Grok Build 可执行 (${GROK:-$(command -v grok)})"
+else
+  wrn "找不到 grok — MiniMax 失败时无回退"
+fi
+if ! { [[ -x "$MMX" ]] || command -v mmx >/dev/null 2>&1; } \
+  && ! { [[ -x "$GROK" ]] || command -v grok >/dev/null 2>&1; }; then
+  bad "mmx 与 grok 均不可用 — 分析链路会失败"
 fi
 
 # 5) 外部群发言权限 + 机器人在群
