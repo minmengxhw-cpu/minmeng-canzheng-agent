@@ -76,8 +76,18 @@ SOURCE_NAME = "上观新闻"
 OFFICIAL_SOURCE_NAME = "上海市人民政府"
 SHIO_SOURCE_NAME = "上海市政府新闻办"
 OFFICIAL_NEWS_URL = "https://www.shanghai.gov.cn/zzbshyw/index.html"
+# 上海要闻列表分页（扩大搜集面，仍只走官方域名）
+OFFICIAL_NEWS_PAGES = int(os.environ.get("OFFICIAL_NEWS_PAGES", "5"))
 SHIO_PUSH_URL = "https://www.shio.gov.cn/TrueCMS/shxwbgs/ywts/ywts.html"
+# 解放日报「要闻」公开列表，补充书记/市长活动（党媒）
+JFDAILY_YAOWEN_URL = "https://www.jfdaily.com/staticsg/data/journal/yaowen/list.json"
+JFDAILY_SOURCE_NAME = "解放日报"
 OFFICIAL_SEARCH_API = "https://search.sh.gov.cn/searchResult"
+# 搜索关键词：姓名 + 职务/会议场景（适度扩面，不铺全站）
+SEARCH_EXTRA_KEYWORDS = (
+    "市委书记", "市长", "市委常委会", "市政府常务会议",
+    "市委常委会会议", "市政府党组", "市推进",
+)
 OFFICIAL_SEARCH_FORM = {
     "pageSize": "20", "resourceType": "", "channel": "",
     "category1": "", "category2": "", "category3": "", "category4": "",
@@ -95,6 +105,8 @@ ACTIVITY_VERBS = [
     "走访", "现场办公", "接待", "看望", "宣讲", "专题", "工作要求",
     "传达", "研究", "审议", "听取", "审定", "签署", "举行", "参加",
     "发布", "通过", "批示", "专题会", "工作会", "现场会", "推进",
+    "走访调研", "实地调研", "督导", "暗访", "反馈", "会见", "会谈",
+    "开幕式", "闭幕式", "启动", "揭牌", "签约", "视察", "巡查",
 ]
 RETROSPECTIVE_TITLE_MARKERS = ("理论亲声讲", "【上海一周】", "文汇讲堂")
 
@@ -258,16 +270,7 @@ def fetch_official_search_page(keyword: str, page_no: int) -> List[Dict]:
     return out
 
 
-def fetch_official_news_list() -> List[Dict]:
-    """直读“上海要闻”首页，绕过搜索索引延迟。"""
-    try:
-        r = requests.get(OFFICIAL_NEWS_URL, headers=HEADERS, timeout=30)
-        r.raise_for_status()
-        soup = BeautifulSoup(r.text, "html.parser")
-    except Exception as e:
-        log(f"    ✗ 上海要闻直连失败: {e}")
-        return []
-
+def _parse_official_news_soup(soup: BeautifulSoup, base_url: str) -> List[Dict]:
     out = []
     for item in soup.select("ul.news-green li"):
         link = item.select_one("a[href]")
@@ -278,7 +281,7 @@ def fetch_official_news_list() -> List[Dict]:
             continue
         title = (link.get("title") or (title_el.get_text(" ", strip=True) if title_el else "")).strip()
         date = date_el.get_text(" ", strip=True).replace(".", "-")
-        url = urllib.parse.urljoin(OFFICIAL_NEWS_URL, link.get("href") or "").split("?", 1)[0]
+        url = urllib.parse.urljoin(base_url, link.get("href") or "").split("?", 1)[0]
         if not title or not re.fullmatch(r"20\d{2}-\d{2}-\d{2}", date) or not url:
             continue
         out.append({
@@ -288,6 +291,36 @@ def fetch_official_news_list() -> List[Dict]:
             "abstract": abstract_el.get_text(" ", strip=True) if abstract_el else "",
             "source": OFFICIAL_SOURCE_NAME,
         })
+    return out
+
+
+def fetch_official_news_list() -> List[Dict]:
+    """直读“上海要闻”列表（多页），绕过搜索索引延迟。"""
+    urls = [OFFICIAL_NEWS_URL]
+    # index.html, index_2.html ... index_N.html
+    for i in range(2, max(2, OFFICIAL_NEWS_PAGES) + 1):
+        urls.append(OFFICIAL_NEWS_URL.replace("index.html", f"index_{i}.html"))
+    out: List[Dict] = []
+    seen = set()
+    for page_url in urls:
+        try:
+            r = requests.get(page_url, headers=HEADERS, timeout=30)
+            if r.status_code == 404:
+                break
+            r.raise_for_status()
+            soup = BeautifulSoup(r.text, "html.parser")
+        except Exception as e:
+            log(f"    ✗ 上海要闻直连失败 {page_url}: {e}")
+            continue
+        page_items = _parse_official_news_soup(soup, page_url)
+        for it in page_items:
+            if it["url"] in seen:
+                continue
+            seen.add(it["url"])
+            out.append(it)
+        if not page_items and page_url != OFFICIAL_NEWS_URL:
+            break
+    log(f"    上海要闻列表共 {len(out)} 条（约 {OFFICIAL_NEWS_PAGES} 页）")
     return out
 
 
@@ -320,6 +353,44 @@ def fetch_shio_push_list() -> List[Dict]:
     return out
 
 
+def fetch_jfdaily_yaowen() -> List[Dict]:
+    """解放日报要闻 JSON（轻量扩源，仅作候选，详情仍核验书记/市长）。"""
+    try:
+        r = requests.get(JFDAILY_YAOWEN_URL, headers=HEADERS, timeout=25)
+        r.raise_for_status()
+        data = r.json()
+    except Exception as e:
+        log(f"    ✗ 解放日报要闻失败: {e}")
+        return []
+    rows = data if isinstance(data, list) else (data.get("list") or data.get("data") or [])
+    if not isinstance(rows, list):
+        return []
+    out = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        title = str(row.get("title") or row.get("TITLE") or "").strip()
+        url = str(row.get("url") or row.get("link") or row.get("URL") or "").strip()
+        date = str(row.get("date") or row.get("pubDate") or row.get("time") or "")[:10]
+        if not re.fullmatch(r"20\d{2}-\d{2}-\d{2}", date):
+            m = re.search(r"20\d{2}-\d{2}-\d{2}", str(row.get("date") or row.get("pubDate") or ""))
+            date = m.group(0) if m else ""
+        if not title or not url or not date:
+            continue
+        if not url.startswith("http"):
+            url = urllib.parse.urljoin("https://www.jfdaily.com/", url)
+        out.append({
+            "date": date,
+            "headline": title[:160],
+            "id": "jfd-" + hashlib.sha1(url.encode("utf-8")).hexdigest()[:20],
+            "url": url,
+            "abstract": title,
+            "source": JFDAILY_SOURCE_NAME,
+        })
+    log(f"    解放日报要闻 {len(out)} 条")
+    return out
+
+
 def title_named_leader(title: str) -> Optional[str]:
     for name in LEADERS:
         if name in title:
@@ -340,7 +411,8 @@ def report_source_priority(item: Dict) -> int:
     return {
         SHIO_SOURCE_NAME: 0,
         OFFICIAL_SOURCE_NAME: 1,
-        SOURCE_NAME: 2,
+        JFDAILY_SOURCE_NAME: 2,
+        SOURCE_NAME: 3,
     }.get(item.get("source", ""), 9)
 
 
@@ -471,7 +543,7 @@ def save(results: List[Dict]):
 def main() -> int:
     since = SINCE or (datetime.now() - timedelta(days=DEFAULT_DAYS)).strftime("%Y-%m-%d")
     log(f"\n=== 抓取市委领导讲话/活动 + 入库分析 ===")
-    log(f"  源：上海要闻 + 市政府新闻办 + 市政府搜索 + 上观新闻 · 回溯至 {since} · 最多 {MAX_PAGES} 翻页 · "
+    log(f"  源：上海要闻(多页) + 市政府新闻办 + 市政府搜索 + 解放日报 + 上观新闻 · 回溯至 {since} · 最多 {MAX_PAGES} 翻页 · "
         f"领导 {list(LEADERS)} · ONLY_SECRETARY={ONLY_SECRETARY}")
 
     # 读历史（断点续抓）
@@ -491,12 +563,14 @@ def main() -> int:
     # 1. 先抓官方直连列表，避免搜索索引延迟；再用搜索和上观新闻补充
     candidates: List[Dict] = []
     seen = set()
-    for item in fetch_official_news_list() + fetch_shio_push_list():
+    for item in fetch_official_news_list() + fetch_shio_push_list() + fetch_jfdaily_yaowen():
         if item["date"] >= since and item["url"] not in seen:
             candidates.append(item)
             seen.add(item["url"])
-    for keyword in LEADERS:
-        for page in range(1, min(MAX_PAGES, 6) + 1):
+    search_keywords = list(LEADERS.keys()) + list(SEARCH_EXTRA_KEYWORDS)
+    search_pages = min(MAX_PAGES, int(os.environ.get("OFFICIAL_SEARCH_PAGES", "10")))
+    for keyword in search_keywords:
+        for page in range(1, search_pages + 1):
             for item in fetch_official_search_page(keyword, page):
                 if item["date"] >= since and item["url"] not in seen:
                     candidates.append(item)
@@ -504,7 +578,7 @@ def main() -> int:
             if candidates and all(x["date"] < since for x in candidates[-20:]):
                 break
     official_count = sum(1 for c in candidates if c.get("source") != SOURCE_NAME)
-    log(f"  上海官方源收集 {official_count} 条")
+    log(f"  上海官方/党媒源收集 {official_count} 条（搜索词 {len(search_keywords)} 个 × 最多 {search_pages} 页）")
 
     # 上观新闻混合流翻页收集补充候选（offsetInfo 游标翻页）
     offset = ""
@@ -562,7 +636,20 @@ def main() -> int:
             skip_norel += 1
             continue  # 标题/摘要既未署名也非领导活动 → 不下钻
 
-        full = fetch_detail(c["id"]) if c.get("source") == SOURCE_NAME else fetch_official_detail(c["url"])
+        if c.get("source") == SOURCE_NAME:
+            full = fetch_detail(c["id"])
+        elif c.get("source") == JFDAILY_SOURCE_NAME:
+            # 解放日报详情页通用正文选择器
+            full = fetch_official_detail(c["url"])
+            if not full:
+                page = fetch(c["url"])
+                if page:
+                    soup = BeautifulSoup(page, "html.parser")
+                    el = (soup.select_one("article") or soup.select_one(".article-content")
+                          or soup.select_one(".TRS_Editor") or soup.select_one("#article-content"))
+                    full = re.sub(r"\s+", " ", el.get_text(" ", strip=True)) if el else ""
+        else:
+            full = fetch_official_detail(c["url"])
         if not full:
             continue
         if not looks_like_current_activity(full, c["date"], c["headline"]):
@@ -576,6 +663,13 @@ def main() -> int:
         analysis = analyze(c["headline"], c["date"], leader["leader"], full)
         if not analysis:
             continue
+        src = c.get("source", SOURCE_NAME)
+        if src == OFFICIAL_SOURCE_NAME or src == SHIO_SOURCE_NAME:
+            tier = "上海官方"
+        elif src == JFDAILY_SOURCE_NAME:
+            tier = "主流党媒"
+        else:
+            tier = "主流党媒"
         entry = {
             "id": f"ld-sh-{c['id']}",
             "date": c["date"], "leader": leader["leader"], "role": leader["role"],
@@ -588,8 +682,8 @@ def main() -> int:
             "subthemes": analysis.get("subthemes", []),
             "keywords": analysis.get("keywords", []),
             "policy_implications": analysis.get("policy_implications", ""),
-            "source": c.get("source", SOURCE_NAME), "url": c["url"],
-            "source_tier": "上海官方" if c.get("source") != SOURCE_NAME else "主流党媒",
+            "source": src, "url": c["url"],
+            "source_tier": tier,
             "verification_status": "原文已核验",
             "analyzed_at": datetime.now().isoformat(timespec="minutes"),
         }

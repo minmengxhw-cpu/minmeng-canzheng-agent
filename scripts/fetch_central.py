@@ -49,8 +49,8 @@ LOG = ROOT / "data" / "central_leaders.log"
 SINCE = os.environ.get("SINCE", "")
 DEFAULT_DAYS = int(os.environ.get("CENTRAL_DEFAULT_DAYS", "7"))
 MAX_PAGES = int(os.environ.get("MAX_PAGES", "6"))
-# 每次运行最多新调模型分析条数，防止费用与体量膨胀
-MAX_ANALYZE = int(os.environ.get("CENTRAL_MAX_ANALYZE", "3"))
+# 每次运行最多新调模型分析条数，防止费用与体量膨胀（可环境变量调高）
+MAX_ANALYZE = int(os.environ.get("CENTRAL_MAX_ANALYZE", "5"))
 
 GOV_SOURCE_NAME = "中国政府网"
 XINHUA_SOURCE_NAME = "新华社"
