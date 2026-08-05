@@ -1,5 +1,16 @@
 # CZ Agent 日更运维清单
 
+## 上海信源（轻量）
+
+| 源 | 方式 | 备注 |
+|----|------|------|
+| 上海要闻 | HTML | 市政府官网 |
+| 市政府新闻办 | HTML | 要闻推送 |
+| 市政府搜索 | 搜索 API | 姓名+职务词 |
+| 解放日报/上观网 | `staticsg/data/web/home/*.json` + `/news/getNewsDetail` | **勿用已 404 的 journal/yaowen/list.json** |
+| 东方网上海 | HTML 尽力而为 | SSL/页面结构不稳时跳过 |
+| 上观腾讯号 | QQ 新闻 JSON 列表 | 原有 |
+
 ## 正确终态
 
 | 项 | 正确值 |

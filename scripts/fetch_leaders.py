@@ -79,9 +79,22 @@ OFFICIAL_NEWS_URL = "https://www.shanghai.gov.cn/zzbshyw/index.html"
 # 上海要闻列表分页（扩大搜集面，仍只走官方域名）
 OFFICIAL_NEWS_PAGES = int(os.environ.get("OFFICIAL_NEWS_PAGES", "5"))
 SHIO_PUSH_URL = "https://www.shio.gov.cn/TrueCMS/shxwbgs/ywts/ywts.html"
-# 解放日报「要闻」公开列表，补充书记/市长活动（党媒）
-JFDAILY_YAOWEN_URL = "https://www.jfdaily.com/staticsg/data/journal/yaowen/list.json"
+# 解放日报 / 上观新闻网（同一套 staticsg 数据；旧 journal/yaowen/list.json 已 404）
 JFDAILY_SOURCE_NAME = "解放日报"
+JFDAILY_DATA_BASE = "https://www.jfdaily.com/staticsg/data/"
+JFDAILY_DETAIL_API = "https://www.jfdaily.com/news/getNewsDetail"
+JFDAILY_HOME_LISTS = (
+    "web/home/topnewslist.json",
+    "web/home/morenewslist.json",
+    "web/home/recommandnewslist.json",
+    "web/home/quicknewslist.json",
+    "web/home/bannernewslist.json",
+)
+# 替代/补充：东方网上海频道（失败时静默跳过，不阻断主链路）
+EASTDAY_SH_URLS = (
+    "https://sh.eastday.com/",
+)
+EASTDAY_SOURCE_NAME = "东方网"
 OFFICIAL_SEARCH_API = "https://search.sh.gov.cn/searchResult"
 # 搜索关键词：姓名 + 职务/会议场景（适度扩面，不铺全站）
 SEARCH_EXTRA_KEYWORDS = (
@@ -353,41 +366,155 @@ def fetch_shio_push_list() -> List[Dict]:
     return out
 
 
-def fetch_jfdaily_yaowen() -> List[Dict]:
-    """解放日报要闻 JSON（轻量扩源，仅作候选，详情仍核验书记/市长）。"""
+def _ms_to_date(ms) -> str:
+    """毫秒时间戳 → YYYY-MM-DD；失败返回空串。"""
     try:
-        r = requests.get(JFDAILY_YAOWEN_URL, headers=HEADERS, timeout=25)
+        ms = int(ms)
+        if ms > 10_000_000_000:  # ms
+            ms = ms / 1000.0
+        return datetime.fromtimestamp(ms).strftime("%Y-%m-%d")
+    except Exception:
+        return ""
+
+
+def _flatten_jfdaily_payload(data) -> List[Dict]:
+    """解放日报 home JSON 结构不统一：list / {top1,top2,list} / {list:[]}。"""
+    rows: List[Dict] = []
+    if isinstance(data, list):
+        rows = [x for x in data if isinstance(x, dict)]
+    elif isinstance(data, dict):
+        if isinstance(data.get("list"), list):
+            rows = [x for x in data["list"] if isinstance(x, dict)]
+        else:
+            for v in data.values():
+                if isinstance(v, list):
+                    rows.extend(x for x in v if isinstance(x, dict))
+                elif isinstance(v, dict) and isinstance(v.get("list"), list):
+                    rows.extend(x for x in v["list"] if isinstance(x, dict))
+    return rows
+
+
+def fetch_jfdaily_yaowen() -> List[Dict]:
+    """解放日报/上观网首页静态 JSON 列表（替代已下线的 journal/yaowen/list.json）。
+
+    列表：/staticsg/data/web/home/*.json
+    正文：/news/getNewsDetail?id=...
+    """
+    out: List[Dict] = []
+    seen = set()
+    for rel in JFDAILY_HOME_LISTS:
+        url = JFDAILY_DATA_BASE + rel
+        try:
+            r = requests.get(url, headers={**HEADERS, "Referer": "https://www.jfdaily.com/"}, timeout=25)
+            r.raise_for_status()
+            payload = r.json()
+        except Exception as e:
+            log(f"    ✗ 解放日报列表失败 {rel}: {e}")
+            continue
+        data = payload.get("data") if isinstance(payload, dict) else payload
+        for row in _flatten_jfdaily_payload(data):
+            nid = row.get("id") or row.get("articleid")
+            title = str(row.get("title") or "").strip()
+            if not nid or not title:
+                continue
+            date = _ms_to_date(row.get("publishtime") or row.get("addtime") or row.get("edittime"))
+            if not date:
+                continue
+            detail_url = (
+                f"https://www.jfdaily.com/staticsg/res/html/web/newsDetail.html"
+                f"?id={nid}&sid=11"
+            )
+            key = str(nid)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append({
+                "date": date,
+                "headline": title[:160],
+                "id": f"jfd-{nid}",
+                "url": detail_url,
+                "abstract": str(row.get("summary") or title)[:300],
+                "source": JFDAILY_SOURCE_NAME,
+                "jfd_nid": str(nid),
+            })
+    log(f"    解放日报/上观网列表 {len(out)} 条（{len(JFDAILY_HOME_LISTS)} 个首页接口）")
+    return out
+
+
+def fetch_jfdaily_detail(nid: str) -> str:
+    """解放日报正文 API：返回纯文本。"""
+    if not nid:
+        return ""
+    try:
+        r = requests.get(
+            JFDAILY_DETAIL_API,
+            params={"id": nid, "ver": "1"},
+            headers={**HEADERS, "Referer": "https://www.jfdaily.com/", "Accept": "application/json"},
+            timeout=30,
+        )
         r.raise_for_status()
-        data = r.json()
+        payload = r.json()
     except Exception as e:
-        log(f"    ✗ 解放日报要闻失败: {e}")
-        return []
-    rows = data if isinstance(data, list) else (data.get("list") or data.get("data") or [])
-    if not isinstance(rows, list):
-        return []
-    out = []
-    for row in rows:
-        if not isinstance(row, dict):
+        log(f"    ✗ 解放日报正文失败 id={nid}: {e}")
+        return ""
+    obj = payload.get("object") if isinstance(payload, dict) else None
+    if not isinstance(obj, dict):
+        return ""
+    html = obj.get("detail") or obj.get("content") or obj.get("htmlcontent") or ""
+    if not html:
+        return str(obj.get("summary") or "")
+    # 去 HTML 标签
+    try:
+        soup = BeautifulSoup(str(html), "html.parser")
+        return re.sub(r"\s+", " ", soup.get_text(" ", strip=True))
+    except Exception:
+        return re.sub(r"<[^>]+>", " ", str(html))
+
+
+def fetch_eastday_sh_list() -> List[Dict]:
+    """东方网上海频道 HTML 列表（解放日报不可用时的替代补充源）。"""
+    out: List[Dict] = []
+    seen = set()
+    for page_url in EASTDAY_SH_URLS:
+        try:
+            r = requests.get(page_url, headers=HEADERS, timeout=25)
+            r.raise_for_status()
+            if not r.encoding or r.encoding.lower() in ("iso-8859-1", "latin-1"):
+                r.encoding = r.apparent_encoding or "utf-8"
+            soup = BeautifulSoup(r.text, "html.parser")
+        except Exception as e:
+            log(f"    ✗ 东方网列表失败 {page_url}: {e}")
             continue
-        title = str(row.get("title") or row.get("TITLE") or "").strip()
-        url = str(row.get("url") or row.get("link") or row.get("URL") or "").strip()
-        date = str(row.get("date") or row.get("pubDate") or row.get("time") or "")[:10]
-        if not re.fullmatch(r"20\d{2}-\d{2}-\d{2}", date):
-            m = re.search(r"20\d{2}-\d{2}-\d{2}", str(row.get("date") or row.get("pubDate") or ""))
-            date = m.group(0) if m else ""
-        if not title or not url or not date:
-            continue
-        if not url.startswith("http"):
-            url = urllib.parse.urljoin("https://www.jfdaily.com/", url)
-        out.append({
-            "date": date,
-            "headline": title[:160],
-            "id": "jfd-" + hashlib.sha1(url.encode("utf-8")).hexdigest()[:20],
-            "url": url,
-            "abstract": title,
-            "source": JFDAILY_SOURCE_NAME,
-        })
-    log(f"    解放日报要闻 {len(out)} 条")
+        for a in soup.find_all("a", href=True):
+            title = re.sub(r"\s+", " ", (a.get_text() or "").strip())
+            href = a["href"].strip()
+            if len(title) < 12 or not href:
+                continue
+            if not any(k in href for k in ("eastday.com", "/n/", "news")):
+                continue
+            if not href.startswith("http"):
+                href = urllib.parse.urljoin(page_url, href)
+            # 尽量从 URL 抽日期
+            m = re.search(r"(20\d{2})[-/]?(\d{2})[-/]?(\d{2})", href)
+            if m:
+                date = f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+            else:
+                date = datetime.now().strftime("%Y-%m-%d")
+            if href in seen:
+                continue
+            seen.add(href)
+            # 先宽进：领导名或活动动词；下游 detail 再核验
+            if not (title_named_leader(title) or title_is_activity(title)):
+                continue
+            out.append({
+                "date": date,
+                "headline": title[:160],
+                "id": "ed-" + hashlib.sha1(href.encode("utf-8")).hexdigest()[:20],
+                "url": href,
+                "abstract": title,
+                "source": EASTDAY_SOURCE_NAME,
+            })
+    log(f"    东方网上海相关候选 {len(out)} 条")
     return out
 
 
@@ -412,7 +539,8 @@ def report_source_priority(item: Dict) -> int:
         SHIO_SOURCE_NAME: 0,
         OFFICIAL_SOURCE_NAME: 1,
         JFDAILY_SOURCE_NAME: 2,
-        SOURCE_NAME: 3,
+        EASTDAY_SOURCE_NAME: 3,
+        SOURCE_NAME: 4,
     }.get(item.get("source", ""), 9)
 
 
@@ -543,7 +671,7 @@ def save(results: List[Dict]):
 def main() -> int:
     since = SINCE or (datetime.now() - timedelta(days=DEFAULT_DAYS)).strftime("%Y-%m-%d")
     log(f"\n=== 抓取市委领导讲话/活动 + 入库分析 ===")
-    log(f"  源：上海要闻(多页) + 市政府新闻办 + 市政府搜索 + 解放日报 + 上观新闻 · 回溯至 {since} · 最多 {MAX_PAGES} 翻页 · "
+    log(f"  源：上海要闻 + 市政府新闻办 + 市政府搜索 + 解放日报/上观网 + 东方网 + 上观腾讯号 · 回溯至 {since} · 最多 {MAX_PAGES} 翻页 · "
         f"领导 {list(LEADERS)} · ONLY_SECRETARY={ONLY_SECRETARY}")
 
     # 读历史（断点续抓）
@@ -563,7 +691,12 @@ def main() -> int:
     # 1. 先抓官方直连列表，避免搜索索引延迟；再用搜索和上观新闻补充
     candidates: List[Dict] = []
     seen = set()
-    for item in fetch_official_news_list() + fetch_shio_push_list() + fetch_jfdaily_yaowen():
+    for item in (
+        fetch_official_news_list()
+        + fetch_shio_push_list()
+        + fetch_jfdaily_yaowen()
+        + fetch_eastday_sh_list()
+    ):
         if item["date"] >= since and item["url"] not in seen:
             candidates.append(item)
             seen.add(item["url"])
@@ -639,14 +772,15 @@ def main() -> int:
         if c.get("source") == SOURCE_NAME:
             full = fetch_detail(c["id"])
         elif c.get("source") == JFDAILY_SOURCE_NAME:
-            # 解放日报详情页通用正文选择器
+            full = fetch_jfdaily_detail(str(c.get("jfd_nid") or "").replace("jfd-", "") or c.get("id", "").replace("jfd-", ""))
+        elif c.get("source") == EASTDAY_SOURCE_NAME:
             full = fetch_official_detail(c["url"])
             if not full:
                 page = fetch(c["url"])
                 if page:
                     soup = BeautifulSoup(page, "html.parser")
-                    el = (soup.select_one("article") or soup.select_one(".article-content")
-                          or soup.select_one(".TRS_Editor") or soup.select_one("#article-content"))
+                    el = (soup.select_one("article") or soup.select_one(".article")
+                          or soup.select_one("#content") or soup.select_one(".TRS_Editor"))
                     full = re.sub(r"\s+", " ", el.get_text(" ", strip=True)) if el else ""
         else:
             full = fetch_official_detail(c["url"])
@@ -664,12 +798,10 @@ def main() -> int:
         if not analysis:
             continue
         src = c.get("source", SOURCE_NAME)
-        if src == OFFICIAL_SOURCE_NAME or src == SHIO_SOURCE_NAME:
+        if src in (OFFICIAL_SOURCE_NAME, SHIO_SOURCE_NAME):
             tier = "上海官方"
-        elif src == JFDAILY_SOURCE_NAME:
-            tier = "主流党媒"
         else:
-            tier = "主流党媒"
+            tier = "主流党媒"  # 解放日报 / 东方网 / 上观腾讯号
         entry = {
             "id": f"ld-sh-{c['id']}",
             "date": c["date"], "leader": leader["leader"], "role": leader["role"],
