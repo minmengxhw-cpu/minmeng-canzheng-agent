@@ -23,7 +23,7 @@ import time
 import urllib.request
 from pathlib import Path
 
-from minimax_cli import minimax_json
+from grok_cli import grok_json
 
 ROOT = Path(__file__).resolve().parent.parent
 CUTS_PATH = ROOT / "data" / "cuts.json"
@@ -142,7 +142,7 @@ def build_user_prompt(cut: dict, draft_type: str, related_excerpts: list) -> str
 
 def llm_call(system: str, user: str, max_tokens: int = 1800) -> dict:
     """调一次 LLM，返回 JSON"""
-    return minimax_json(system, user, max_tokens=max_tokens, temperature=0.4)
+    return grok_json(system, user, max_tokens=max_tokens, temperature=0.4)
 
 
 def main():

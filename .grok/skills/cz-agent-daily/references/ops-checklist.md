@@ -19,7 +19,7 @@
 | 推送群 | `oc_381bea46653394d135daf14739524904` |
 | 群类型 | external=true |
 | 发言权限 | all_members |
-| 分析 | MiniMax mmx / MiniMax-M3 |
+| 分析 | Grok Build grok / grok-4.5 |
 | 简报入口 | update_all → gen_brief 仅一次 |
 | 旧群 | 永不推送 |
 | 公开二维码 | 禁用 |
@@ -38,12 +38,12 @@
 cd "$HOME/Library/Application Support/minmeng-canzheng-agent"
 set -a; source .env; set +a
 export FEISHU_CHAT_ID=oc_381bea46653394d135daf14739524904
-export MINIMAX_CLI=/opt/homebrew/bin/mmx
-export MINIMAX_MODEL=MiniMax-M3
+export GROK_CLI="$HOME/.grok/bin/grok"
+export GROK_MODEL=grok-4.5
 bash scripts/update_and_push.sh
 ```
 
 ## 日志关键字
 
-- 成功：`已主动推送飞书` + `执行引擎: MiniMax`  
-- 失败：`Aborting` / `230035` / `230002` / `Token Plan 用量上限`
+- 成功：`已主动推送飞书` + `执行引擎: Grok Build`  
+- 失败：`Aborting` / `230035` / `230002` / Grok CLI 超时或登录失效

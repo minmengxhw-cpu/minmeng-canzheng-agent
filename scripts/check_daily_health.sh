@@ -85,13 +85,13 @@ if grep -qE '^FEISHU_WEBHOOK=' "$ENVF" 2>/dev/null && ! grep -qE '^#.*FEISHU_WEB
   fi
 fi
 
-# 4) MiniMax
-echo "[4] MiniMax CLI"
-MMX="${MINIMAX_CLI:-/opt/homebrew/bin/mmx}"
-if [[ -x "$MMX" ]] || command -v mmx >/dev/null 2>&1; then
-  ok "mmx 可执行 ($MMX)"
+# 4) Grok Build CLI
+echo "[4] Grok Build CLI"
+GROK="${GROK_CLI:-$HOME/.grok/bin/grok}"
+if [[ -x "$GROK" ]] || command -v grok >/dev/null 2>&1; then
+  ok "grok 可执行 (${GROK:-$(command -v grok)})"
 else
-  bad "找不到 mmx — 分析链路会失败"
+  bad "找不到 grok — 分析链路会失败"
 fi
 
 # 5) 外部群发言权限 + 机器人在群
@@ -123,7 +123,7 @@ fi
 echo "[6] 今日定时执行日志"
 TODAY=$(date +%Y-%m-%d)
 if [[ -f "$OUT_LOG" ]]; then
-  if rg -q "自动更新开始：${TODAY}T08:30|执行引擎: MiniMax.*${TODAY}|${TODAY}T08:3" "$OUT_LOG" 2>/dev/null \
+  if rg -q "自动更新开始：${TODAY}T08:30|执行引擎: Grok|执行引擎: MiniMax|${TODAY}T08:3" "$OUT_LOG" 2>/dev/null \
      || rg -q "${TODAY}T08:30" "$OUT_LOG" 2>/dev/null; then
     ok "日志出现今日 08:30 相关记录"
   else

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 日更入口（launchd 仅 08:30，不发晚报）
-# 分析统一由 MiniMax CLI（mmx · MiniMax-M3）执行；简报规则拼装后推外部飞书群。
+# 分析统一由 Grok Build CLI（grok · grok-4.5）执行；简报规则拼装后推外部飞书群。
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -23,21 +23,22 @@ do
   fi
 done
 
-# —— MiniMax 执行环境（分析链路依赖）——
-export MINIMAX_CLI="${MINIMAX_CLI:-$(command -v mmx 2>/dev/null || true)}"
-export MINIMAX_CLI="${MINIMAX_CLI:-/opt/homebrew/bin/mmx}"
-export MINIMAX_MODEL="${MINIMAX_MODEL:-MiniMax-M3}"
-export MINIMAX_TIMEOUT="${MINIMAX_TIMEOUT:-240}"
-export PATH="/Users/cheer/.local/bin:/opt/homebrew/bin:/usr/local/bin:${PATH:-/usr/bin:/bin}"
+# —— Grok Build 执行环境（分析链路依赖）——
+export PATH="$HOME/.grok/bin:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:${PATH:-/usr/bin:/bin}"
+export GROK_CLI="${GROK_CLI:-$(command -v grok 2>/dev/null || true)}"
+export GROK_CLI="${GROK_CLI:-$HOME/.grok/bin/grok}"
+export GROK_MODEL="${GROK_MODEL:-grok-4.5}"
+export GROK_TIMEOUT="${GROK_TIMEOUT:-240}"
+export GROK_PERMISSION_MODE="${GROK_PERMISSION_MODE:-bypassPermissions}"
 
-if [[ ! -x "$MINIMAX_CLI" ]]; then
-  echo "ERROR: 未找到 MiniMax CLI（mmx）。路径=$MINIMAX_CLI" >&2
-  echo "请安装/登录 mmx 后重试；分析步骤依赖 MiniMax 执行。" >&2
+if [[ ! -x "$GROK_CLI" ]]; then
+  echo "ERROR: 未找到 Grok Build CLI（grok）。路径=$GROK_CLI" >&2
+  echo "请安装/登录 grok 后重试；分析步骤依赖 Grok Build 执行。" >&2
   exit 1
 fi
 
-echo "执行引擎: MiniMax CLI=$MINIMAX_CLI  model=$MINIMAX_MODEL"
-"$MINIMAX_CLI" --version 2>/dev/null | head -n 1 || true
+echo "执行引擎: Grok Build CLI=$GROK_CLI  model=$GROK_MODEL"
+"$GROK_CLI" --version 2>/dev/null | head -n 1 || true
 
 # 运行副本常被 install_launchd rsync 弄脏 scripts/，会阻断 merge 导致整链失败、简报漏发
 git fetch origin main
@@ -49,11 +50,12 @@ if ! git merge --ff-only origin/main; then
 fi
 
 SINCE="$(date -v-7d +%F)"
-echo "开始流水线（MiniMax 分析 → 简报 → 飞书外部群） since=$SINCE"
-MINIMAX_CLI="$MINIMAX_CLI" \
-MINIMAX_MODEL="$MINIMAX_MODEL" \
-MINIMAX_TIMEOUT="$MINIMAX_TIMEOUT" \
-  # max-pages：上观腾讯约 20 条/页；过小会漏掉书记市长通稿（曾导致报告日卡在 8/1）
+echo "开始流水线（Grok 分析 → 简报 → 飞书外部群） since=$SINCE"
+# max-pages：上观腾讯约 20 条/页；过小会漏掉书记市长通稿
+GROK_CLI="$GROK_CLI" \
+GROK_MODEL="$GROK_MODEL" \
+GROK_TIMEOUT="$GROK_TIMEOUT" \
+GROK_PERMISSION_MODE="$GROK_PERMISSION_MODE" \
   python3 scripts/update_all.py --since "$SINCE" --max-pages 12 --skip-drafts
 
 # 简报生成与飞书推送已在 update_all.py → gen_brief.py 完成，勿再调一次，否则会重复推送

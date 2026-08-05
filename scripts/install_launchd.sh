@@ -23,12 +23,14 @@ import os, plistlib, sys
 from pathlib import Path
 
 root, plist_path, log_dir = map(Path, sys.argv[1:])
+home = Path.home()
 common_env = {
-    "HOME": str(Path.home()),
-    "PATH": "/Users/cheer/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
-    "MINIMAX_CLI": "/opt/homebrew/bin/mmx",
-    "MINIMAX_MODEL": "MiniMax-M3",
-    "MINIMAX_TIMEOUT": "240",
+    "HOME": str(home),
+    "PATH": f"{home}/.grok/bin:{home}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
+    "GROK_CLI": str(home / ".grok/bin/grok"),
+    "GROK_MODEL": "grok-4.5",
+    "GROK_TIMEOUT": "240",
+    "GROK_PERMISSION_MODE": "bypassPermissions",
 }
 # 从本地 .env 注入飞书 Webhook（不写进仓库）
 env_candidates = [
@@ -84,4 +86,4 @@ launchctl bootout "gui/$(id -u)" "$PLIST" 2>/dev/null || true
 launchctl bootout "gui/$(id -u)" "$CENTRAL_PLIST" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
 echo "旧 central-watch 任务已停用，原 plist 文件保留不删除"
-echo "已安装：每天 08:30 由 MiniMax（mmx · MiniMax-M3）执行抓取分析，并推送外部飞书群"
+echo "已安装：每天 08:30 由 Grok Build（grok · grok-4.5）执行抓取分析，并推送外部飞书群"
