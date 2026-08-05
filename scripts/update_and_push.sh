@@ -53,7 +53,8 @@ echo "开始流水线（MiniMax 分析 → 简报 → 飞书外部群） since=$
 MINIMAX_CLI="$MINIMAX_CLI" \
 MINIMAX_MODEL="$MINIMAX_MODEL" \
 MINIMAX_TIMEOUT="$MINIMAX_TIMEOUT" \
-  python3 scripts/update_all.py --since "$SINCE" --max-pages 6 --skip-drafts
+  # max-pages：上观腾讯约 20 条/页；过小会漏掉书记市长通稿（曾导致报告日卡在 8/1）
+  python3 scripts/update_all.py --since "$SINCE" --max-pages 12 --skip-drafts
 
 # 简报生成与飞书推送已在 update_all.py → gen_brief.py 完成，勿再调一次，否则会重复推送
 

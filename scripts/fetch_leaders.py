@@ -89,6 +89,25 @@ JFDAILY_HOME_LISTS = (
     "web/home/recommandnewslist.json",
     "web/home/quicknewslist.json",
     "web/home/bannernewslist.json",
+    # 扩充：时政/要闻类频道（不存在则静默 404 跳过）
+    "web/channel/yaowen/list.json",
+    "web/channel/shizheng/list.json",
+    "web/channel/shanghai/list.json",
+    "web/home/hotnewslist.json",
+    "web/home/focusnewslist.json",
+)
+# 上观新闻（shobserver）主站详情，作为腾讯号列表的补充发现通道
+SHOBSERVER_SOURCE_NAME = "上观新闻网"
+SHOBSERVER_DETAIL_URLS = (
+    "https://www.shobserver.cn/news/detail?id={id}",
+    "https://www.jfdaily.com/wx/detail.do?id={id}",
+    "https://www.shobserver.com/wx/detail.do?id={id}",
+)
+# 搜狐「上观新闻」账号（转载及时，可发现官网/腾讯列表尚未露出的书记市长通稿）
+SOHU_SHOBSERVER_MEDIA_ID = "121332532"
+SOHU_SHOBSERVER_API = (
+    "https://v2.sohu.com/author-page-api/author-articles/pc/"
+    + SOHU_SHOBSERVER_MEDIA_ID
 )
 # 替代/补充：东方网上海频道（失败时静默跳过，不阻断主链路）
 EASTDAY_SH_URLS = (
@@ -216,7 +235,10 @@ def fetch_list_page(offset_info: str) -> Optional[Dict]:
 
 
 def parse_list(data: Dict) -> List[Dict]:
-    """从列表接口 JSON 提取条目：标题 + 摘要 + URL + 日期"""
+    """从列表接口 JSON 提取条目：标题 + 摘要 + URL + 日期。
+
+    必须标记 source=上观新闻，否则主循环会误走官网正文解析，导致腾讯上观候选静默丢弃。
+    """
     out: List[Dict] = []
     for n in data.get("newslist", []):
         if n.get("articletype") not in ("0", 0, "", None):  # 0=图文；过滤纯视频/直播/广告
@@ -228,11 +250,18 @@ def parse_list(data: Dict) -> List[Dict]:
         title = (n.get("longtitle") or n.get("title") or "").strip()
         if len(title) < 5:
             continue
-        abstract = (n.get("nlpAbstract") or "") + " " + (n.get("nlpContentAbstract") or "")
+        abstract = (
+            (n.get("nlpAbstract") or "")
+            + " "
+            + (n.get("nlpContentAbstract") or "")
+            + " "
+            + (n.get("abstract") or "")
+        )
         out.append({
             "date": t, "headline": title[:160], "id": aid,
             "url": n.get("url") or (DETAIL_RAIN + aid),
             "abstract": abstract.strip(),
+            "source": SOURCE_NAME,
         })
     return out
 
@@ -342,6 +371,9 @@ def fetch_shio_push_list() -> List[Dict]:
     try:
         r = requests.get(SHIO_PUSH_URL, headers=HEADERS, timeout=30)
         r.raise_for_status()
+        # 服务端常不声明 charset，requests 会误判 ISO-8859-1 导致标题乱码，姓名门控全部失效
+        if not r.encoding or r.encoding.lower() in ("iso-8859-1", "latin-1"):
+            r.encoding = "utf-8"
         soup = BeautifulSoup(r.text, "html.parser")
     except Exception as e:
         log(f"    ✗ 市政府新闻办直连失败: {e}")
@@ -355,7 +387,8 @@ def fetch_shio_push_list() -> List[Dict]:
             continue
         title = (link.get("title") or link.get_text(" ", strip=True)).strip()
         date_match = re.search(r"20\d{2}-\d{2}-\d{2}", date_el.get_text(" ", strip=True))
-        url = urllib.parse.urljoin(SHIO_PUSH_URL, link.get("href") or "")
+        raw_href = (link.get("href") or "").replace("../..//", "../../")
+        url = urllib.parse.urljoin(SHIO_PUSH_URL, raw_href)
         if not title or not date_match or not url:
             continue
         out.append({
@@ -471,6 +504,137 @@ def fetch_jfdaily_detail(nid: str) -> str:
         return re.sub(r"<[^>]+>", " ", str(html))
 
 
+def _html_article_text(html: str) -> str:
+    soup = BeautifulSoup(html, "html.parser")
+    for sel in (
+        "article", ".article-content", ".detail-content", "#content",
+        ".TRS_Editor", ".rich_media_content", "#mp-editor", ".text",
+        ".article", ".content-article",
+    ):
+        el = soup.select_one(sel)
+        if el:
+            txt = re.sub(r"\s+", " ", el.get_text(" ", strip=True))
+            if len(txt) > 80:
+                return txt
+    return re.sub(r"\s+", " ", soup.get_text(" ", strip=True))
+
+
+def fetch_shobserver_html_detail(nid: str) -> str:
+    """上观/解放日报 H5 详情页兜底（getNewsDetail 失败时）。"""
+    if not nid:
+        return ""
+    for tmpl in SHOBSERVER_DETAIL_URLS:
+        url = tmpl.format(id=nid)
+        try:
+            r = requests.get(url, headers=HEADERS, timeout=25)
+            if r.status_code != 200 or len(r.text) < 200:
+                continue
+            if not r.encoding or r.encoding.lower() in ("iso-8859-1", "latin-1"):
+                r.encoding = r.apparent_encoding or "utf-8"
+            txt = _html_article_text(r.text)
+            if len(txt) > 80 and any(n in txt for n in LEADERS):
+                return txt
+            if len(txt) > 200:
+                return txt
+        except Exception:
+            continue
+    return ""
+
+
+def fetch_sohu_shobserver_media(limit: int = 60, max_pages: int = 5) -> List[Dict]:
+    """从搜狐「上观新闻」账号 API 发现近期时政稿（补腾讯列表滞后/漏载）。
+
+    API: v2.sohu.com/author-page-api/author-articles/pc/121332532
+    仅收下标题署领导名或活动动词的条目；正文走搜狐页 / 上观 H5。
+    """
+    out: List[Dict] = []
+    seen = set()
+    pages = max(1, min(max_pages, int(os.environ.get("SOHU_SG_PAGES", str(max_pages)))))
+    api_headers = {
+        **HEADERS,
+        "Accept": "application/json, text/plain, */*",
+        "Referer": f"https://www.sohu.com/media/{SOHU_SHOBSERVER_MEDIA_ID}",
+        "Origin": "https://www.sohu.com",
+    }
+    for pno in range(1, pages + 1):
+        rows = []
+        try:
+            r = requests.get(
+                SOHU_SHOBSERVER_API,
+                params={"pNo": pno},
+                headers=api_headers,
+                timeout=25,
+            )
+            if r.status_code == 406:
+                # 部分环境对 python-requests 指纹返回 406，改 curl 兼容拉 JSON
+                import subprocess
+                url = f"{SOHU_SHOBSERVER_API}?pNo={pno}"
+                raw = subprocess.check_output(
+                    ["curl", "-sS", "-m", "25", "-A", HEADERS["User-Agent"],
+                     "-H", "Accept: application/json, text/plain, */*",
+                     "-H", f"Referer: https://www.sohu.com/media/{SOHU_SHOBSERVER_MEDIA_ID}",
+                     url],
+                    text=True,
+                )
+                payload = json.loads(raw)
+            else:
+                r.raise_for_status()
+                payload = r.json()
+            rows = ((payload.get("data") or {}).get("pcArticleVOS") or []) if isinstance(payload, dict) else []
+        except Exception as e:
+            log(f"    ✗ 搜狐上观 API 失败 pNo={pno}: {e}")
+            break
+        if not rows:
+            break
+        for row in rows:
+            title = re.sub(r"\s+", " ", str(row.get("title") or row.get("mobileTitle") or "").strip())
+            if len(title) < 10:
+                continue
+            if not (title_named_leader(title) or title_is_activity(title)):
+                continue
+            sohu_id = str(row.get("id") or "")
+            if not sohu_id or sohu_id in seen:
+                continue
+            seen.add(sohu_id)
+            # publicTime: 2026-08-05T12:47:24.000+00:00
+            pt = str(row.get("publicTime") or "")
+            date = pt[:10] if re.match(r"20\d{2}-\d{2}-\d{2}", pt) else datetime.now().strftime("%Y-%m-%d")
+            link = str(row.get("link") or f"www.sohu.com/a/{sohu_id}_{SOHU_SHOBSERVER_MEDIA_ID}")
+            if not link.startswith("http"):
+                link = "https://" + link.lstrip("/")
+            brief = re.sub(r"\s+", " ", str(row.get("brief") or title))[:300]
+            out.append({
+                "date": date,
+                "headline": title[:160],
+                "id": f"sohu-sg-{sohu_id}",
+                "url": link,
+                "abstract": brief,
+                "source": SHOBSERVER_SOURCE_NAME,
+                "jfd_nid": "",
+                "sohu_url": link,
+            })
+            if len(out) >= limit:
+                log(f"    搜狐上观账号候选 {len(out)} 条（标题门控后，{pno} 页）")
+                return out
+    log(f"    搜狐上观账号候选 {len(out)} 条（标题门控后，{pages} 页）")
+    return out
+
+
+def fetch_sohu_article_text(url: str) -> str:
+    """读取搜狐转载正文（最后兜底）。"""
+    if not url:
+        return ""
+    try:
+        r = requests.get(url, headers=HEADERS, timeout=25)
+        r.raise_for_status()
+        if not r.encoding or r.encoding.lower() in ("iso-8859-1", "latin-1"):
+            r.encoding = "utf-8"
+        return _html_article_text(r.text)
+    except Exception as e:
+        log(f"    ✗ 搜狐正文失败: {e}")
+        return ""
+
+
 def fetch_eastday_sh_list() -> List[Dict]:
     """东方网上海频道 HTML 列表（解放日报不可用时的替代补充源）。"""
     out: List[Dict] = []
@@ -539,8 +703,9 @@ def report_source_priority(item: Dict) -> int:
         SHIO_SOURCE_NAME: 0,
         OFFICIAL_SOURCE_NAME: 1,
         JFDAILY_SOURCE_NAME: 2,
-        EASTDAY_SOURCE_NAME: 3,
-        SOURCE_NAME: 4,
+        SHOBSERVER_SOURCE_NAME: 3,
+        EASTDAY_SOURCE_NAME: 4,
+        SOURCE_NAME: 5,
     }.get(item.get("source", ""), 9)
 
 
@@ -612,6 +777,56 @@ def fetch_official_detail(url: str) -> str:
         return ""
 
 
+def analyze_fallback(headline: str, date: str, leader: str, full_text: str) -> Dict:
+    """MiniMax 额度/网络失败时的规则入库，避免候选全丢、报告日长期卡住。"""
+    text = re.sub(r"\s+", " ", full_text or "")[:5000]
+    sents = [s.strip() for s in re.split(r"[。！？]", text) if 10 <= len(s.strip()) <= 90]
+    key_sents = [
+        s for s in sents
+        if any(k in s for k in ("强调", "指出", "要求", "希望", "部署", "审议", "主持", "调研"))
+    ][:5]
+    if not key_sents:
+        key_sents = sents[:3]
+    phrases = []
+    for s in key_sents:
+        m = re.search(r"(?:强调|指出|要求|希望)[，,:]?(.*)$", s)
+        frag = (m.group(1) if m else s).strip(" ，,")
+        frag = re.sub(rf"^(?:{re.escape(leader)}|他|她|其)(?:还)?", "", frag).strip(" ，,")
+        if 6 <= len(frag) <= 40:
+            phrases.append(frag)
+    theme = _correct_theme("", headline, headline)
+    # 再从正文前部做一次主题纠偏
+    theme = _correct_theme(theme, headline, text[:400])
+    summary = "。".join(key_sents[:3])
+    if summary and not summary.endswith("。"):
+        summary += "。"
+    if not summary:
+        summary = (headline or "")[:160]
+    kws = []
+    for w in ("人工智能", "新质生产力", "营商环境", "安全生产", "全面从严治党",
+              "科技创新", "民生", "开放", "城市治理", "创智学院", "调研", "座谈会"):
+        if w in headline or w in text[:900]:
+            kws.append(w)
+    if not kws:
+        kws = [leader, "公开活动"]
+    occasion = headline[:18] if headline else f"{leader}公开活动"
+    for marker in ("调研", "座谈会", "常委会", "会见", "会议", "考察", "走访"):
+        if marker in (headline or ""):
+            occasion = f"{leader}{marker}"[:18]
+            break
+    return {
+        "occasion": occasion,
+        "summary": summary[:220],
+        "key_points": key_sents[:4] or [headline],
+        "new_phrasing": phrases[:4] or key_sents[:2],
+        "theme": theme or "城市治理",
+        "subthemes": kws[:3],
+        "keywords": kws[:5],
+        "policy_implications": "可对照本次公开要求，结合上海相关领域落实情况提出参政议政调研切口。",
+        "_fallback": True,
+    }
+
+
 def analyze(headline: str, date: str, leader: str, full_text: str) -> Dict:
     if not full_text or len(full_text) < 80:
         return {}
@@ -635,12 +850,16 @@ def analyze(headline: str, date: str, leader: str, full_text: str) -> Dict:
 }}"""
     for attempt in range(2):
         try:
-            return minimax_json(SYSTEM_PROMPT, user, max_tokens=1200, temperature=0.2)
+            result = minimax_json(SYSTEM_PROMPT, user, max_tokens=1200, temperature=0.2)
+            if result and (result.get("summary") or result.get("key_points")):
+                return result
         except Exception as e:
             if attempt == 1:
-                log(f"    ✗ 分析失败: {e}")
-                return {}
-            time.sleep(3)
+                log(f"    ✗ 分析失败，改用规则兜底: {e}")
+            else:
+                time.sleep(3)
+    log("  使用规则兜底摘要（保证入库）")
+    return analyze_fallback(headline, date, leader, full_text)
 
 
 def detect_change(new: Dict, history: List[Dict]) -> Dict:
@@ -696,6 +915,7 @@ def main() -> int:
         + fetch_shio_push_list()
         + fetch_jfdaily_yaowen()
         + fetch_eastday_sh_list()
+        + fetch_sohu_shobserver_media()
     ):
         if item["date"] >= since and item["url"] not in seen:
             candidates.append(item)
@@ -769,11 +989,21 @@ def main() -> int:
             skip_norel += 1
             continue  # 标题/摘要既未署名也非领导活动 → 不下钻
 
-        if c.get("source") == SOURCE_NAME:
-            full = fetch_detail(c["id"])
-        elif c.get("source") == JFDAILY_SOURCE_NAME:
-            full = fetch_jfdaily_detail(str(c.get("jfd_nid") or "").replace("jfd-", "") or c.get("id", "").replace("jfd-", ""))
-        elif c.get("source") == EASTDAY_SOURCE_NAME:
+        src = c.get("source") or ""
+        url = c.get("url") or ""
+        # 腾讯上观：必须走 rain 详情；兼容历史漏标 source 的候选
+        if src == SOURCE_NAME or ("news.qq.com" in url or "inews.qq.com" in url or re.match(r"^\d{8}[A-Z0-9]+$", str(c.get("id") or ""))):
+            full = fetch_detail(str(c.get("id") or ""))
+        elif src in (JFDAILY_SOURCE_NAME, SHOBSERVER_SOURCE_NAME):
+            nid = str(c.get("jfd_nid") or "").replace("jfd-", "") or str(c.get("id", "")).replace("jfd-", "")
+            full = fetch_jfdaily_detail(nid) if nid and nid.isdigit() else ""
+            if not full and nid:
+                full = fetch_shobserver_html_detail(nid)
+            if not full and c.get("sohu_url"):
+                full = fetch_sohu_article_text(c["sohu_url"])
+            if not full and url and "sohu.com" in url:
+                full = fetch_sohu_article_text(url)
+        elif src == EASTDAY_SOURCE_NAME:
             full = fetch_official_detail(c["url"])
             if not full:
                 page = fetch(c["url"])
@@ -784,6 +1014,11 @@ def main() -> int:
                     full = re.sub(r"\s+", " ", el.get_text(" ", strip=True)) if el else ""
         else:
             full = fetch_official_detail(c["url"])
+            # shio 等可能编码/选择器差异：HTML 兜底
+            if not full and url:
+                page = fetch(url)
+                if page:
+                    full = _html_article_text(page)
         if not full:
             continue
         if not looks_like_current_activity(full, c["date"], c["headline"]):
@@ -797,11 +1032,11 @@ def main() -> int:
         analysis = analyze(c["headline"], c["date"], leader["leader"], full)
         if not analysis:
             continue
-        src = c.get("source", SOURCE_NAME)
+        src = c.get("source") or SOURCE_NAME
         if src in (OFFICIAL_SOURCE_NAME, SHIO_SOURCE_NAME):
             tier = "上海官方"
         else:
-            tier = "主流党媒"  # 解放日报 / 东方网 / 上观腾讯号
+            tier = "主流党媒"  # 解放日报 / 上观 / 东方网 / 腾讯号
         entry = {
             "id": f"ld-sh-{c['id']}",
             "date": c["date"], "leader": leader["leader"], "role": leader["role"],
@@ -814,9 +1049,9 @@ def main() -> int:
             "subthemes": analysis.get("subthemes", []),
             "keywords": analysis.get("keywords", []),
             "policy_implications": analysis.get("policy_implications", ""),
-            "source": src, "url": c["url"],
+            "source": src, "url": c.get("url") or c.get("sohu_url") or "",
             "source_tier": tier,
-            "verification_status": "原文已核验",
+            "verification_status": "原文已核验" + ("·规则摘要" if analysis.get("_fallback") else ""),
             "analyzed_at": datetime.now().isoformat(timespec="minutes"),
         }
         entry.update(detect_change(entry, results))
