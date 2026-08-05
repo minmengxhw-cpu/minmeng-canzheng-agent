@@ -45,18 +45,19 @@ OUT_JSON = os.path.join(ROOT, "data", "brief_latest.json")
 BRIEF_DIR = os.path.join(ROOT, "briefs")
 SITE_DEFAULT = "https://minmengxhw-cpu.github.io/minmeng-canzheng-agent/"
 
-# 飞书 1 分钟：三块结构，略放宽总长；无省略号
-MAX_PUSH_CHARS = 760
-MAX_POINTS_PER_ITEM = 1
-MAX_QUOTES_PER_ITEM = 2
-MAX_DAY_QUOTES = 2
-MAX_KEYWORDS = 5
-MAX_CHANGE_WORDS = 2
-MAX_QUOTE_LEN = 36
+# 推送体量：只报「报告日当日新增」，条目写细并附原文链接；无省略号
+MAX_PUSH_CHARS = 2200
+MAX_POINTS_PER_ITEM = 4
+MAX_QUOTES_PER_ITEM = 4
+MAX_DAY_QUOTES = 5
+MAX_KEYWORDS = 6
+MAX_CHANGE_WORDS = 3
+MAX_QUOTE_LEN = 48
 MAX_KW_LEN = 16
-MAX_CENTRAL_NEWS = 2
-MAX_SH_NEWS = 3
-CENTRAL_LOOKBACK_DAYS = 7
+MAX_CENTRAL_NEWS = 3
+MAX_SH_NEWS = 5
+# 中央：仅当「信号日 = 报告日」才写入；不再回看 7 天旧闻
+CENTRAL_LOOKBACK_DAYS = 0
 
 # 低信息量填充，不作为金句/关键词主推
 _STOP_FRAGMENTS = (
@@ -290,9 +291,15 @@ def _score_gold_quote(
 
     if any(f in raw for f in _STOP_FRAGMENTS) and n < 12:
         score -= 1.5
+    # 场景叙述句（今天上午前往…）不是金句
+    if re.match(r"^(?:今天|昨日|昨天|近日|上午|下午)", raw) or "前往" in raw[:12] or "走访调研" in raw:
+        score -= 4
     # 含顿号/对仗的表述更像金句
     if "、" in raw or "，" in raw[:20]:
         score += 0.8
+    # 判断式/部署式加分
+    if any(k in raw for k in ("打造", "提升", "加快", "优化", "强化", "坚持", "聚焦", "推进")):
+        score += 1.2
     return score
 
 
@@ -354,30 +361,57 @@ def _pick_gold_quotes(
     return picked[:limit]
 
 
+def _is_scene_sentence(p: str) -> bool:
+    """是否现场叙述（非政策要点/金句）。"""
+    p = _clean_space(p)
+    if re.match(r"^(?:今天|昨日|昨天|近日)?(?:上午|下午|晚上)?，?(?:市委书记|市长)?", p):
+        if any(k in p[:30] for k in ("前往", "走访", "调研", "主持", "出席", "会见")):
+            return True
+    if p.startswith("今天上午") or p.startswith("昨天下午"):
+        return True
+    return False
+
+
 def _item_points(s: dict) -> List[str]:
-    """取完整要点（不截断）。保持分析原序，优先首条主旨。"""
-    pts = _as_list(s.get("key_points"))
-    if pts:
-        out = []
-        for p in pts:
-            p = _clean_space(p)
-            if 8 <= len(p) <= 56:
-                out.append(p)
-            if len(out) >= MAX_POINTS_PER_ITEM:
-                break
-        if out:
+    """取完整要点（不截断）。优先判断式/部署式，过滤纯现场叙述。"""
+    out: List[str] = []
+    seen: Set[str] = set()
+
+    def _add(p: str) -> None:
+        p = _clean_space(p).rstrip("。．")
+        if not (8 <= len(p) <= 140) or _is_scene_sentence(p):
+            return
+        p2 = re.sub(
+            r"^(?:陈吉宁|龚正|他|会议)(?:指出|强调|要求|表示|希望)[，,：:\s]*",
+            "",
+            p,
+        )
+        p = p2 or p
+        if len(p) < 8:
+            return
+        n = _normalize_phrase(p)
+        if not n or n in seen or _is_subsumed(n, out):
+            return
+        seen.add(n)
+        out.append(p)
+
+    for p in _as_list(s.get("key_points")):
+        _add(p)
+        if len(out) >= MAX_POINTS_PER_ITEM:
             return out
-    summary = (s.get("summary") or "").strip()
-    if summary:
-        sent = _complete_sentences(summary, 56)
-        if sent:
-            return [sent.rstrip("。．")]
-    phrases = np_of(s)
-    for p in phrases:
-        p = _display_phrase(p)
-        if 6 <= len(p) <= 40:
-            return [p]
-    return []
+    for p in _split_sents(s.get("summary") or ""):
+        _add(p)
+        if len(out) >= MAX_POINTS_PER_ITEM:
+            return out
+    for p in _extract_judgement_sents(_clean_space(s.get("full_text") or ""), limit=8):
+        _add(p)
+        if len(out) >= MAX_POINTS_PER_ITEM:
+            return out
+    for p in np_of(s):
+        _add(_display_phrase(p))
+        if len(out) >= MAX_POINTS_PER_ITEM:
+            break
+    return out
 
 
 def _load_json_list(path: str) -> List[dict]:
@@ -452,22 +486,9 @@ def _day_overview_dual(
     central_date: str,
     sh_items: List[dict],
 ) -> str:
-    """政务体要情导读（完整句，无省略号）。"""
+    """要情导读：只描述报告日当日新增，不提旧闻。"""
+    date_cn = _ymd_cn(maxd)
     parts: List[str] = []
-    if central_items:
-        c_cn = _ymd_cn(central_date) if central_date else _ymd_cn(maxd)
-        titles = []
-        for it in central_items[:2]:
-            direction = it.get("direction") or ""
-            t = direction.split("｜")[-1] if "｜" in direction else direction
-            t = _clean_space(t) or (it.get("occasion") or it.get("headline") or "公开活动")
-            titles.append(t)
-        tip = "、".join(titles)
-        parts.append(
-            f"中央层面（{c_cn}）发布公开要情{len(central_items)}条，涉及{tip}"
-        )
-    else:
-        parts.append("中央层面公开通道本期无新增要情")
     if sh_items:
         themes: List[str] = []
         seen = set()
@@ -483,12 +504,91 @@ def _day_overview_dual(
                 leaders.append(name)
         who = "、".join(leaders) if leaders else "市委市政府主要领导"
         theme_txt = "、".join(themes[:3]) if themes else "综合工作"
+        # 点出首条标题，方便一眼看到最新事
+        first = _item_title(sh_items[0])
+        tip = f"，重点包括{first}" if first else ""
         parts.append(
-            f"上海层面{who}开展公开活动{len(sh_items)}场，工作方向集中于{theme_txt}"
+            f"{date_cn}上海层面{who}新增公开活动{len(sh_items)}场，方向集中于{theme_txt}{tip}"
         )
-    else:
-        parts.append("上海层面本期无新增公开活动")
+    if central_items and central_date == maxd:
+        titles = []
+        for it in central_items[:2]:
+            t = _clean_space(it.get("headline") or it.get("occasion") or "")
+            if t:
+                titles.append(t)
+        tip = "、".join(titles) if titles else "公开要情"
+        parts.append(f"中央层面同日新增{len(central_items)}条（{tip}）")
+    if not parts:
+        return f"{date_cn}中央与上海公开通道均无新增信号。"
     return "；".join(parts) + "。"
+
+
+def _split_sents(text: str) -> List[str]:
+    return [x.strip() for x in re.split(r"(?<=[。！？])", text or "") if x and x.strip()]
+
+
+def _extract_judgement_sents(full: str, limit: int = 5) -> List[str]:
+    """从正文抽判断式/部署式句子（去掉纯现场叙述）。"""
+    out: List[str] = []
+    for x in _split_sents(full):
+        if _is_scene_sentence(x):
+            continue
+        if not any(k in x for k in ("指出", "强调", "要求", "希望", "要", "部署", "打造", "提升", "加快", "优化")):
+            continue
+        # 去掉主语套话
+        x2 = re.sub(
+            r"^(?:陈吉宁|龚正|他|会议)(?:指出|强调|要求|表示|希望)[，,：:\s]*",
+            "",
+            _clean_space(x),
+        )
+        x2 = x2.rstrip("。．")
+        if 10 <= len(x2) <= 140:
+            out.append(x2)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _enrich_summary(s: dict) -> str:
+    """摘要过短时从 full_text 补 2–4 句，便于「详细一点」。"""
+    summary = _clean_space(s.get("summary") or "")
+    full = _clean_space(s.get("full_text") or "")
+    if not full:
+        return summary
+    # 摘要已够长时仍可并入 1–2 句判断式，避免只有“走访”场面
+    judgements = _extract_judgement_sents(full, limit=4)
+    if len(summary) >= 160 and judgements:
+        # 若摘要已含关键判断句则不动
+        if any(j[:12] in summary for j in judgements[:2]):
+            return summary
+    if judgements:
+        # 首句可保留场面，后接判断句
+        lead = ""
+        for x in _split_sents(full):
+            if _is_scene_sentence(x) or "调研" in x[:20]:
+                lead = _clean_space(x)
+                break
+        body = "。".join(judgements[:3])
+        if body and not body.endswith("。"):
+            body += "。"
+        if lead and lead not in body:
+            merged = lead.rstrip("。") + "。" + body
+        else:
+            merged = body
+        if len(merged) > len(summary):
+            return merged[:480]
+    if len(summary) >= 120:
+        return summary
+    sents = _split_sents(full)
+    key = [
+        x for x in sents
+        if any(k in x for k in ("指出", "强调", "要求", "希望", "部署", "调研", "主持"))
+    ]
+    pool = key[:4] if key else sents[:3]
+    merged = _clean_space("".join(pool))
+    if len(merged) > len(summary):
+        return merged[:400]
+    return summary or merged
 
 
 def build_structured_items(
@@ -501,13 +601,28 @@ def build_structured_items(
     for s in raw_today:
         phrases = np_of(s)
         change_phrases = _parse_change_phrases(s.get("change_note") or "", phrases)
+        summary = _enrich_summary(s)
+        s2 = dict(s)
+        s2["summary"] = summary
+        points = _item_points(s2)
+        # 金句池：new_phrasing + 变化词 + 从要点切短句
+        gold_pool = list(phrases) + list(change_phrases)
+        for p in points:
+            # 长要点里按逗号切出 10–40 字判断小句
+            for frag in re.split(r"[，,；;]", p):
+                frag = _clean_space(frag)
+                if 10 <= len(frag) <= MAX_QUOTE_LEN and any(
+                    k in frag for k in ("打造", "提升", "加快", "优化", "强化", "坚持", "聚焦", "推进", "培养", "部署")
+                ):
+                    gold_pool.append(frag)
         gold = _pick_gold_quotes(
-            phrases,
+            gold_pool,
             change_phrases,
             hist=hist,
             chrono=chrono,
             limit=MAX_QUOTES_PER_ITEM,
         )
+        gold = [g for g in gold if not _is_scene_sentence(g)]
         kws = [_display_phrase(k) for k in _as_list(s.get("keywords"))[:6]]
         channel = s.get("_channel") or "shanghai"
         theme = (s.get("theme") or "综合").strip()
@@ -520,12 +635,12 @@ def build_structured_items(
                 "headline": s.get("headline", "") or s.get("occasion", ""),
                 "occasion": s.get("occasion", ""),
                 "direction": f"{theme}｜{_activity_title(s)}",
-                "points": _item_points(s),
+                "points": points,
                 "gold_quotes": gold,
                 "keywords": kws,
                 "channel": channel,
                 "change_phrases": [p for p in change_phrases[:4] if p],
-                "summary": _clean_space(s.get("summary") or ""),
+                "summary": summary,
                 "url": s.get("url", ""),
                 "phrases": [_display_phrase(p) for p in phrases[:6]],
                 "change_note": _clean_space(s.get("change_note") or ""),
@@ -679,20 +794,21 @@ def _strip_names_in_body(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip(" ，,。：:")
 
 
-def _item_brief_line(it: dict, max_chars: int = 64) -> str:
-    """单条动态完整摘要：优先完整要点句；不加省略号。"""
-    for p in it.get("points") or []:
-        p = _strip_names_in_body(_clean_space(p))
-        if 8 <= len(p) <= max_chars:
-            return p if p[-1] in "。．！？!?" else p + "。"
+def _item_brief_line(it: dict, max_chars: int = 160) -> str:
+    """单条动态完整摘要：优先 summary，其次要点；不加省略号。"""
     if it.get("summary"):
-        body = _strip_names_in_body(it["summary"])
+        body = _clean_space(it["summary"])
+        # 摘要里保留领导名，读起来更清楚
         sent = _complete_sentences(body, max_chars)
         if sent:
             return sent
+    for p in it.get("points") or []:
+        p = _clean_space(p)
+        if 8 <= len(p) <= max_chars:
+            return p if p[-1] in "。．！？!?" else p + "。"
     for q in it.get("gold_quotes") or []:
         q = _display_phrase(q)
-        if 4 <= len(q) <= 36:
+        if 4 <= len(q) <= MAX_QUOTE_LEN:
             return f"核心表述为“{q}”。"
     return "详见公开报道。"
 
@@ -777,12 +893,73 @@ def _brief_heading(maxd: str) -> Tuple[str, str, str]:
 
 
 def _item_title(it: dict) -> str:
+    """优先完整报道标题，避免只剩「调研」二字。"""
+    for key in ("headline", "occasion"):
+        t = _clean_space(it.get(key) or "")
+        if t and len(t) >= 6:
+            return t
     direction = it.get("direction") or ""
     title = direction.split("｜")[-1] if "｜" in direction else direction
     title = _clean_space(title)
-    if not title:
-        title = it.get("occasion") or it.get("headline") or it.get("theme") or "公开活动"
-    return title
+    return title or (it.get("theme") or "公开活动")
+
+
+def _append_item_detail(
+    lines: List[str],
+    it: dict,
+    *,
+    idx: int,
+    brief_max: int,
+    n_points: int,
+    n_quotes: int,
+) -> None:
+    """单条：主题 + 领导 + 标题 + 摘要 + 要点 + 金句 + 原文链接。"""
+    theme = it.get("theme") or "综合"
+    who = (it.get("leader") or "").strip()
+    title = _item_title(it)
+    head = f"{idx}. 【{theme}】"
+    if who:
+        head += f"{who} · "
+    head += title
+    lines.append(head)
+
+    body = _item_brief_line(it, max_chars=brief_max)
+    if body:
+        lines.append(f"摘要：{body}")
+
+    points = [p for p in (it.get("points") or []) if _clean_space(p)][:n_points]
+    if points:
+        lines.append("要点：")
+        for p in points:
+            p = _clean_space(p)
+            if p[-1] not in "。．！？!?":
+                p += "。"
+            lines.append(f"· {p}")
+
+    raw_q = list(it.get("gold_quotes") or []) + list(it.get("phrases") or [])
+    raw_q = [q for q in raw_q if not _is_scene_sentence(q)]
+    quotes = _filter_full_phrases(raw_q, MAX_QUOTE_LEN, n_quotes)
+    # 若条目级金句不足，用 points 里短句补（仍排除场景叙述）
+    if len(quotes) < n_quotes:
+        for p in points:
+            q = _display_phrase(p)
+            if _is_scene_sentence(q):
+                continue
+            if 6 <= len(q) <= MAX_QUOTE_LEN and _normalize_phrase(q) not in {
+                _normalize_phrase(x) for x in quotes
+            }:
+                quotes.append(q)
+            if len(quotes) >= n_quotes:
+                break
+    if quotes:
+        lines.append("金句：")
+        for q in quotes:
+            lines.append(f"· {q}")
+
+    url = (it.get("url") or "").strip()
+    if url:
+        lines.append(f"原文：{url}")
+    lines.append("")
 
 
 def _append_level_block(
@@ -799,8 +976,15 @@ def _append_level_block(
     n_chg: int,
     n_news: int,
     brief_max: int,
+    omit_if_empty: bool = False,
 ) -> None:
-    """政务体：某层面 = 关键词 + 重要表述 + 动态摘要。"""
+    """政务体：某层面 = 关键词 + 重要表述 + 分条详情（附链接）。
+
+    omit_if_empty=True 时：无新增则整节不写（避免用旧闻填中央）。
+    """
+    if not items and omit_if_empty:
+        return
+
     lines.append(f"**{section_no}、{level_name}**")
     if date_note:
         lines.append(f"（信号日期：{date_note}）")
@@ -840,18 +1024,17 @@ def _append_level_block(
         for i, c in enumerate(chg_show, 1):
             lines.append(f"{i}. {c}")
         lines.append("")
-        abs_title = "（四）动态摘要"
+        abs_title = "（四）动态详情"
     else:
-        abs_title = "（三）动态摘要"
+        abs_title = "（三）动态详情"
 
     lines.append(abs_title)
+    lines.append("")
     news = items[:n_news]
     for i, it in enumerate(news, 1):
-        theme = it.get("theme") or "综合"
-        title = _item_title(it)
-        body = _item_brief_line(it, max_chars=brief_max)
-        lines.append(f"{i}. 【{theme}】{title}。{body}")
-    lines.append("")
+        _append_item_detail(
+            lines, it, idx=i, brief_max=brief_max, n_points=MAX_POINTS_PER_ITEM, n_quotes=2
+        )
 
 
 def build_push_markdown(
@@ -866,12 +1049,19 @@ def build_push_markdown(
     hot_txt: str,
     site: str,
 ) -> str:
-    """政务体简报：要情导读 → 中央层面 → 上海层面 → 周观察。无省略号。"""
+    """政务体简报：只写报告日新增；上海优先；中央无新增则省略；不回放旧闻/周观察。
+
+    注意：标题只出现在飞书卡片/消息头，正文不再重复写刊头标题。
+    """
 
     period = _period_label()
     date_cn = _ymd_cn(maxd)
     c_date_cn = _ymd_cn(central_date) if central_date else ""
-    _, body_head, issue = _brief_heading(maxd)
+    _, _, issue = _brief_heading(maxd)
+
+    # 中央仅当日
+    c_items = central_items if (central_items and central_date == maxd) else []
+    c_signals = central_signals if c_items else {}
 
     def assemble(
         n_ckw: int,
@@ -885,7 +1075,6 @@ def build_push_markdown(
         brief_max: int,
     ) -> str:
         lines: List[str] = [
-            body_head,
             f"期号：{issue}",
             f"报告日期：{date_cn}",
             f"刊次：{period}",
@@ -894,26 +1083,13 @@ def build_push_markdown(
             overview,
             "",
         ]
+        # 上海优先（用户最关心市委领导最新活动）
+        sec_sh = "二"
+        sec_c = "三"
         _append_level_block(
             lines,
-            section_no="二",
-            level_name="中央层面",
-            signals=central_signals if central_items else {},
-            items=central_items,
-            empty_note="本期中央层面公开通道无新增要情。",
-            date_note=c_date_cn if central_items and central_date != maxd else (
-                c_date_cn if central_items else ""
-            ),
-            n_kw=n_ckw,
-            n_q=n_cq,
-            n_chg=n_cchg,
-            n_news=n_cnews,
-            brief_max=brief_max,
-        )
-        _append_level_block(
-            lines,
-            section_no="三",
-            level_name="上海层面",
+            section_no=sec_sh,
+            level_name="上海层面（当日新增）",
             signals=sh_signals if sh_items else {},
             items=sh_items,
             empty_note="本期上海层面无新增公开活动。",
@@ -924,22 +1100,37 @@ def build_push_markdown(
             n_news=n_snews,
             brief_max=brief_max,
         )
-        lines.append("**四、近七日上海主题观察**")
-        lines.append(
-            hot_txt + "。" if hot_txt and not str(hot_txt).endswith("。") else (hot_txt or "暂无。")
-        )
-        lines.append("")
+        if c_items:
+            _append_level_block(
+                lines,
+                section_no=sec_c,
+                level_name="中央层面（当日新增）",
+                signals=c_signals,
+                items=c_items,
+                empty_note="",
+                date_note=c_date_cn,
+                n_kw=n_ckw,
+                n_q=n_cq,
+                n_chg=n_cchg,
+                n_news=n_cnews,
+                brief_max=brief_max,
+            )
+        else:
+            lines.append(f"**{sec_c}、中央层面**")
+            lines.append("本期无新增（不回放往日旧闻）。")
+            lines.append("")
+
         lines.append("**【编校说明】**")
-        lines.append("本文稿依据公开报道整理，仅供参阅；具体表述与政策口径以权威原文为准。")
+        lines.append("仅汇总报告日公开新增信号；具体表述以权威原文为准。")
         if site:
             lines.append(f"专栏网页：{site}")
         return "\n".join(lines).strip()
 
     plans = [
-        (4, 2, 2, 5, 2, 2, MAX_CENTRAL_NEWS, MAX_SH_NEWS, 56),
-        (3, 2, 1, 4, 2, 1, 2, 2, 48),
-        (3, 1, 1, 3, 2, 1, 1, 2, 44),
-        (2, 1, 0, 3, 1, 1, 1, 2, 40),
+        (4, 3, 2, 6, 4, 2, MAX_CENTRAL_NEWS, MAX_SH_NEWS, 200),
+        (3, 2, 1, 5, 3, 2, 2, 4, 160),
+        (2, 2, 1, 4, 2, 1, 1, 3, 140),
+        (2, 1, 0, 3, 2, 1, 1, 2, 120),
     ]
     body = assemble(*plans[0])
     for plan in plans[1:]:
@@ -966,6 +1157,7 @@ def build_archive_md(
 ) -> str:
     period = _period_label()
     issue = _issue_no(maxd, period)
+    c_items = central_items if (central_items and central_date == maxd) else []
     lines = [
         f"# 参政议政动态简报{issue}（{period}）",
         "",
@@ -977,44 +1169,9 @@ def build_archive_md(
         "",
         overview,
         "",
-        "## 二、中央层面",
+        "## 二、上海层面（当日新增）",
         "",
     ]
-    if central_date:
-        lines.append(f"信号日期：{_ymd_cn(central_date)}")
-        lines.append("")
-    if central_items:
-        kws = central_signals.get("keywords") or []
-        quotes = central_signals.get("gold_quotes") or []
-        chg = central_signals.get("change_words") or []
-        if kws:
-            lines.append("### （一）关键词")
-            lines.append("、".join(kws) + "。")
-            lines.append("")
-        if quotes:
-            lines.append("### （二）重要表述")
-            for i, q in enumerate(quotes, 1):
-                lines.append(f"{i}. {q}")
-            lines.append("")
-        if chg:
-            lines.append("### （三）新提法与变化")
-            for c in chg:
-                lines.append(f"- {c}")
-            lines.append("")
-        lines.append("### 动态摘要")
-        for n, i in enumerate(central_items, 1):
-            lines.append(f"{n}. {i.get('occasion') or i.get('headline')}")
-            if i.get("summary"):
-                lines.append(i["summary"])
-            if i.get("url"):
-                lines.append(f"原文：{i['url']}")
-            lines.append("")
-    else:
-        lines.append("本期中央层面公开通道无新增要情。")
-        lines.append("")
-
-    lines.append("## 三、上海层面")
-    lines.append("")
     kws = sh_signals.get("keywords") or []
     quotes = sh_signals.get("gold_quotes") or []
     chg = sh_signals.get("change_words") or []
@@ -1032,37 +1189,56 @@ def build_archive_md(
         for c in chg:
             lines.append(f"- {c}")
         lines.append("")
-    lines.append("### 动态摘要")
+    lines.append("### 动态详情")
     lines.append("")
     if sh_items:
         for n, i in enumerate(sh_items, 1):
-            who = f"{i.get('leader') or ''}"
-            title = i.get("occasion") or i.get("headline") or ""
-            lines.append(f"{n}. 【{i.get('theme') or ''}】{who} · {title}")
-            if i.get("summary"):
-                lines.append(i["summary"])
-            elif i.get("points"):
-                lines.append(i["points"][0])
-            if i.get("url"):
-                lines.append(f"原文：{i['url']}")
-            lines.append("")
+            _append_item_detail(
+                lines, i, idx=n, brief_max=220, n_points=MAX_POINTS_PER_ITEM, n_quotes=3
+            )
     else:
         lines.append("本期上海层面无新增公开活动。")
         lines.append("")
 
-    lines.append(f"## 四、近七日上海主题观察（{since} 至 {maxd}）")
-    lines.append(f"- 公开信号 {week_n} 条，新提法 {week_phrases} 条")
-    lines.append(f"- 活跃主题：{hot_txt}")
+    lines.append("## 三、中央层面（当日新增）")
     lines.append("")
+    if c_items:
+        if central_date:
+            lines.append(f"信号日期：{_ymd_cn(central_date)}")
+            lines.append("")
+        ck = central_signals.get("keywords") or []
+        cq = central_signals.get("gold_quotes") or []
+        if ck:
+            lines.append("### （一）关键词")
+            lines.append("、".join(ck) + "。")
+            lines.append("")
+        if cq:
+            lines.append("### （二）重要表述")
+            for i, q in enumerate(cq, 1):
+                lines.append(f"{i}. {q}")
+            lines.append("")
+        lines.append("### 动态详情")
+        lines.append("")
+        for n, i in enumerate(c_items, 1):
+            _append_item_detail(
+                lines, i, idx=n, brief_max=220, n_points=MAX_POINTS_PER_ITEM, n_quotes=3
+            )
+    else:
+        lines.append("本期无新增（不回放往日旧闻）。")
+        lines.append("")
+
     lines.append("## 编校说明")
     lines.append("")
-    lines.append("本文稿依据公开报道整理，仅供参阅；具体表述与政策口径以权威原文为准。")
+    lines.append("仅汇总报告日公开新增信号；具体表述与政策口径以权威原文为准。")
     lines.append("")
     lines.append(f"专栏网页：{site}")
     return "\n".join(lines)
 
 
 def _push_feishu(title: str, push_body: str, has_signal: bool) -> None:
+    if os.environ.get("SKIP_FEISHU", "").strip() in ("1", "true", "yes"):
+        print("brief: 已跳过飞书推送（SKIP_FEISHU=1）")
+        return
     hook = os.environ.get("FEISHU_WEBHOOK", "").strip()
     chat_id = os.environ.get("FEISHU_CHAT_ID", "").strip()
     if not hook and not chat_id:
@@ -1098,6 +1274,8 @@ def _push_feishu(title: str, push_body: str, has_signal: bool) -> None:
 
 
 def _push_legacy_webhook(md_text: str, has_signal: bool) -> None:
+    if os.environ.get("SKIP_FEISHU", "").strip() in ("1", "true", "yes"):
+        return
     hook = os.environ.get("BRIEF_WEBHOOK", "").strip()
     if not hook:
         return
@@ -1135,20 +1313,22 @@ def main() -> None:
     chrono = _load_phrase_counts()
     hist_all = _build_history_phrase_index(sh_data + central_data, maxd)
 
-    # —— 上海：报告日当日 ——
+    # —— 上海：仅报告日当日新增 ——
     sh_raw = [s for s in sh_data if s["date"] == maxd]
     sh_raw.sort(
         key=lambda s: (s.get("role_rank", 9), s.get("leader", ""), s.get("headline", ""))
     )
     sh_items = build_structured_items(sh_raw, hist=hist_all, chrono=chrono)
 
-    # —— 中央：报告日当日；若无，则取近 7 天内最新有数据的一天 ——
+    # —— 中央：仅报告日当日新增；绝不回填往日旧闻 ——
     central_date = ""
     central_raw: List[dict] = [s for s in central_data if s["date"] == maxd]
     if central_raw:
         central_date = maxd
-    else:
-        since_c = dminus(maxd, CENTRAL_LOOKBACK_DAYS)
+    # 可选：显式允许回看（兼容旧 env）；默认 0 = 不回看
+    lookback = int(os.environ.get("CENTRAL_LOOKBACK_DAYS", str(CENTRAL_LOOKBACK_DAYS)))
+    if not central_raw and lookback > 0:
+        since_c = dminus(maxd, lookback)
         cand_dates = sorted(
             {s["date"] for s in central_data if since_c <= s["date"] <= maxd},
             reverse=True,
@@ -1158,6 +1338,11 @@ def main() -> None:
             central_raw = [s for s in central_data if s["date"] == central_date]
     central_raw.sort(key=lambda s: (s.get("headline", "")))
     central_items = build_structured_items(central_raw, hist=hist_all, chrono=chrono)
+    # 再保险：非当日中央不进推送结构
+    if central_date and central_date != maxd and lookback <= 0:
+        central_items = []
+        central_date = ""
+        central_raw = []
 
     since = dminus(maxd, 6)
     week_sh = [s for s in sh_data if s["date"] >= since]

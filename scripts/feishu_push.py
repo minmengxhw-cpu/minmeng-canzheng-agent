@@ -164,8 +164,23 @@ def _format_markdown(
     lines: Optional[list] = None,
     site_url: str = "",
 ) -> str:
-    # summary 可为多段简报正文；若已含网页链接则不再追加
-    parts: List[str] = [f"**{title}**", "", summary.strip()]
+    # summary 可为多段简报正文；若正文已含刊头/标题则不再重复加粗标题
+    summary = (summary or "").strip()
+    title = (title or "").strip()
+    already_titled = False
+    if title and summary:
+        head = summary.split("\n", 1)[0]
+        if title in head or head.lstrip("*").startswith("参政议政动态简报"):
+            already_titled = True
+        # 正文以「期号：」起头时，标题只出现一次（由调用方卡片头或首行承担）
+        if head.startswith("期号：") or head.startswith("**期号"):
+            already_titled = False  # 仍可在首行加标题，但正文无刊头
+    if already_titled:
+        parts: List[str] = [summary]
+    elif title:
+        parts = [f"**{title}**", "", summary]
+    else:
+        parts = [summary]
     if lines:
         parts.append("")
         for x in lines[:8]:
