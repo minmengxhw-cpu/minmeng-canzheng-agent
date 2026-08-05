@@ -89,12 +89,6 @@ JFDAILY_HOME_LISTS = (
     "web/home/recommandnewslist.json",
     "web/home/quicknewslist.json",
     "web/home/bannernewslist.json",
-    # 扩充：时政/要闻类频道（不存在则静默 404 跳过）
-    "web/channel/yaowen/list.json",
-    "web/channel/shizheng/list.json",
-    "web/channel/shanghai/list.json",
-    "web/home/hotnewslist.json",
-    "web/home/focusnewslist.json",
 )
 # 上观新闻（shobserver）主站详情，作为腾讯号列表的补充发现通道
 SHOBSERVER_SOURCE_NAME = "上观新闻网"
