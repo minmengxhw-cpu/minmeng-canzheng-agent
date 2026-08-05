@@ -1117,7 +1117,7 @@ def build_push_markdown(
             )
         else:
             lines.append(f"**{sec_c}、中央层面**")
-            lines.append("本期无新增（不回放往日旧闻）。")
+            lines.append("本期无新增。")
             lines.append("")
 
         lines.append("**【编校说明】**")
@@ -1224,7 +1224,7 @@ def build_archive_md(
                 lines, i, idx=n, brief_max=220, n_points=MAX_POINTS_PER_ITEM, n_quotes=3
             )
     else:
-        lines.append("本期无新增（不回放往日旧闻）。")
+        lines.append("本期无新增。")
         lines.append("")
 
     lines.append("## 编校说明")
