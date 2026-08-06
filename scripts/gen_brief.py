@@ -45,8 +45,8 @@ OUT_JSON = os.path.join(ROOT, "data", "brief_latest.json")
 BRIEF_DIR = os.path.join(ROOT, "briefs")
 SITE_DEFAULT = "https://minmengxhw-cpu.github.io/minmeng-canzheng-agent/"
 
-# 推送体量：只报「报告日当日新增」，条目写细并附原文链接；无省略号
-MAX_PUSH_CHARS = 2200
+# 推送体量：报告日新增 + 精神/关注点变化/参政议政切口；无省略号
+MAX_PUSH_CHARS = 2800
 MAX_POINTS_PER_ITEM = 4
 MAX_QUOTES_PER_ITEM = 4
 MAX_DAY_QUOTES = 5
@@ -58,6 +58,12 @@ MAX_CENTRAL_NEWS = 3
 MAX_SH_NEWS = 5
 # 中央：仅当「信号日 = 报告日」才写入；不再回看 7 天旧闻
 CENTRAL_LOOKBACK_DAYS = 0
+# 不展示的转载域名（如搜狐），避免非权威原文链进入简报
+_BLOCKED_URL_HOSTS = (
+    "sohu.com",
+    "www.sohu.com",
+    "m.sohu.com",
+)
 
 # 低信息量填充，不作为金句/关键词主推
 _STOP_FRAGMENTS = (
@@ -479,6 +485,157 @@ def _normalize_shanghai_raw(s: dict) -> dict:
     return s
 
 
+def _public_url(url: str) -> str:
+    """过滤搜狐等非权威转载链；保留市政府/解放日报/政府网等。"""
+    url = (url or "").strip()
+    if not url or not url.startswith("http"):
+        return ""
+    low = url.lower()
+    for host in _BLOCKED_URL_HOSTS:
+        if host in low:
+            return ""
+    return url
+
+
+def _derive_spirit(s: dict, points: List[str], summary: str) -> str:
+    """提炼活动精神要旨（政治判断，非场面叙述）。"""
+    chunks: List[str] = []
+    for p in points[:3]:
+        p = _clean_space(p)
+        if p and not _is_scene_sentence(p):
+            chunks.append(p.rstrip("。"))
+    if not chunks and summary:
+        for sent in _split_sents(summary):
+            if _is_scene_sentence(sent):
+                continue
+            if any(k in sent for k in ("指出", "强调", "要求", "希望", "部署", "要")):
+                s2 = re.sub(
+                    r"^(?:陈吉宁|龚正|他|会议)(?:指出|强调|要求|表示|希望)[，,：:\s]*",
+                    "",
+                    _clean_space(sent),
+                )
+                if len(s2) >= 12:
+                    chunks.append(s2.rstrip("。"))
+            if len(chunks) >= 2:
+                break
+    theme = (s.get("theme") or "").strip()
+    who = (s.get("leader") or "主要领导").strip()
+    if not chunks:
+        hl = _clean_space(s.get("headline") or s.get("occasion") or "")
+        return f"{who}围绕{theme or '重点工作'}开展公开活动，释放持续推进相关部署的明确信号。"
+    body = "；".join(chunks[:3])
+    if not body.endswith("。"):
+        body += "。"
+    return f"{who}此次活动精神，集中体现为：{body}"
+
+
+def _derive_policy_cut(s: dict, points: List[str], theme: str) -> str:
+    """参政议政切口（项目初衷：服务民盟建言）。"""
+    raw = s.get("policy_implications")
+    if isinstance(raw, list):
+        raw = "；".join(str(x) for x in raw if x)
+    raw = _clean_space(str(raw or ""))
+    weak = (
+        not raw
+        or "可对照本次公开要求" in raw
+        or len(raw) < 24
+    )
+    if not weak:
+        return raw if raw.endswith("。") else raw + "。"
+    # 规则补强：按主题给可操作切口
+    tip_map = {
+        "科技产业": "民盟可围绕基础研究稳定支持、人工智能顶尖人才培养评价、产学研成果走向真实场景的中试与概念验证机制等中观议题开展调研。",
+        "开放发展": "民盟可围绕外资研发本地化对接、开放平台制度型开放与界别优势转化等议题提出建议。",
+        "民生治理": "民盟可聚焦基层治理末梢、公共服务均衡与群众可感的政策评估开展调研。",
+        "城市治理": "民盟可围绕超大城市风险防控、治理数字化与事前预防型制度完善提出参政议政建议。",
+        "营商环境": "民盟可就企业全周期服务、创新要素对接与细分赛道政策精准性开展界别调研。",
+        "生态环境": "民盟可围绕绿色低碳转型、重大工程与生态协同治理开展专题建言。",
+        "文化教育": "民盟可就教育科技人才一体推进、拔尖创新人才早期培养与评价改革提出建议。",
+    }
+    base = tip_map.get(theme, "民盟可对照本次公开部署，选择可操作的中观切口开展调研建言。")
+    # 从要点抽 1 个关键词增强针对性
+    hint = ""
+    for p in points:
+        for w in ("人工智能", "基础研究", "人才培养", "安全生产", "营商环境", "新质生产力"):
+            if w in p:
+                hint = f"尤可关注「{w}」落地中的制度堵点与资源错配。"
+                break
+        if hint:
+            break
+    return base.rstrip("。") + ("。" if not hint else "；" + hint)
+
+
+def _focus_shift_lines(
+    today_items: List[dict],
+    recent_raw: List[dict],
+    *,
+    maxd: str,
+) -> List[str]:
+    """相对近七日历史，提炼关注点变化（服务参政议政研判）。"""
+    lines: List[str] = []
+    today_themes = []
+    seen_t = set()
+    for it in today_items:
+        t = (it.get("theme") or "").strip()
+        if t and t not in seen_t:
+            seen_t.add(t)
+            today_themes.append(t)
+    prev = [s for s in recent_raw if s.get("date") and s["date"] < maxd]
+    prev_themes = Counter(
+        (s.get("theme") or "").strip() for s in prev if (s.get("theme") or "").strip()
+    )
+    # 主题层面
+    if today_themes:
+        cont = [t for t in today_themes if prev_themes.get(t, 0) >= 1]
+        fresh = [t for t in today_themes if prev_themes.get(t, 0) == 0]
+        if cont:
+            lines.append(
+                f"主题延续：{ '、'.join(cont) }仍在领导公开活动中保持高权重。"
+            )
+        if fresh:
+            lines.append(f"主题抬升：{ '、'.join(fresh) }成为报告日新出现的主轴方向。")
+        # 同主题内表述升级
+        for t in today_themes[:2]:
+            today_phr = []
+            for it in today_items:
+                if (it.get("theme") or "") == t:
+                    today_phr.extend(it.get("phrases") or [])
+                    today_phr.extend(it.get("gold_quotes") or [])
+            prev_phr = set()
+            for s in prev:
+                if (s.get("theme") or "") != t:
+                    continue
+                for p in np_of(s):
+                    prev_phr.add(_normalize_phrase(p))
+            novel = []
+            for p in today_phr:
+                n = _normalize_phrase(p)
+                if n and n not in prev_phr and 6 <= len(p) <= 40 and not _is_scene_sentence(p):
+                    novel.append(_display_phrase(p))
+            # 去重
+            uniq = []
+            seen = set()
+            for p in novel:
+                k = _normalize_phrase(p)
+                if k not in seen:
+                    seen.add(k)
+                    uniq.append(p)
+            if uniq:
+                lines.append(
+                    f"「{t}」表述升级：相较近期同主题活动，新近突出“{uniq[0]}”"
+                    + (f"、“{uniq[1]}”" if len(uniq) > 1 else "")
+                    + "。"
+                )
+    if not lines and today_items:
+        who = "、".join(
+            dict.fromkeys(it.get("leader") or "" for it in today_items if it.get("leader"))
+        ) or "主要领导"
+        lines.append(
+            f"{who}公开活动释放的信号，宜放在近七日工作主轴中连续跟踪，研判部署落地节奏。"
+        )
+    return lines[:4]
+
+
 def _day_overview_dual(
     maxd: str,
     *,
@@ -486,7 +643,7 @@ def _day_overview_dual(
     central_date: str,
     sh_items: List[dict],
 ) -> str:
-    """要情导读：只描述报告日当日新增，不提旧闻。"""
+    """要情导读：政治判断口吻，点出精神主轴，不写场面流水账。"""
     date_cn = _ymd_cn(maxd)
     parts: List[str] = []
     if sh_items:
@@ -504,11 +661,22 @@ def _day_overview_dual(
                 leaders.append(name)
         who = "、".join(leaders) if leaders else "市委市政府主要领导"
         theme_txt = "、".join(themes[:3]) if themes else "综合工作"
-        # 点出首条标题，方便一眼看到最新事
-        first = _item_title(sh_items[0])
-        tip = f"，重点包括{first}" if first else ""
+        spirits = [it.get("spirit") or "" for it in sh_items if it.get("spirit")]
+        spirit_hint = ""
+        if spirits:
+            s0 = spirits[0]
+            m = re.search(r"集中体现为[：:](.+)$", s0)
+            core = (m.group(1) if m else s0).strip()
+            # 导读只取第一分句，且保证完整句读
+            core = re.split(r"[；;]", core)[0].strip().rstrip("。")
+            if 8 <= len(core) <= 80:
+                spirit_hint = f"核心精神指向{core}"
+            elif core:
+                # 过长则落到主题级判断，避免半句截断
+                spirit_hint = f"核心精神聚焦{theme_txt}部署落地"
         parts.append(
-            f"{date_cn}上海层面{who}新增公开活动{len(sh_items)}场，方向集中于{theme_txt}{tip}"
+            f"{date_cn}上海{who}新增公开活动{len(sh_items)}场，工作主轴在{theme_txt}"
+            + (f"。{spirit_hint}" if spirit_hint else "")
         )
     if central_items and central_date == maxd:
         titles = []
@@ -517,7 +685,7 @@ def _day_overview_dual(
             if t:
                 titles.append(t)
         tip = "、".join(titles) if titles else "公开要情"
-        parts.append(f"中央层面同日新增{len(central_items)}条（{tip}）")
+        parts.append(f"中央层面同日新增{len(central_items)}条，涉及{tip}")
     if not parts:
         return f"{date_cn}中央与上海公开通道均无新增信号。"
     return "；".join(parts) + "。"
@@ -626,6 +794,8 @@ def build_structured_items(
         kws = [_display_phrase(k) for k in _as_list(s.get("keywords"))[:6]]
         channel = s.get("_channel") or "shanghai"
         theme = (s.get("theme") or "综合").strip()
+        spirit = _derive_spirit(s, points, summary)
+        policy_cut = _derive_policy_cut(s, points, theme)
         items.append(
             {
                 "date": s.get("date", ""),
@@ -641,7 +811,9 @@ def build_structured_items(
                 "channel": channel,
                 "change_phrases": [p for p in change_phrases[:4] if p],
                 "summary": summary,
-                "url": s.get("url", ""),
+                "spirit": spirit,
+                "policy_cut": policy_cut,
+                "url": _public_url(s.get("url", "")),
                 "phrases": [_display_phrase(p) for p in phrases[:6]],
                 "change_note": _clean_space(s.get("change_note") or ""),
             }
@@ -913,7 +1085,7 @@ def _append_item_detail(
     n_points: int,
     n_quotes: int,
 ) -> None:
-    """单条：主题 + 领导 + 标题 + 摘要 + 要点 + 金句 + 原文链接。"""
+    """单条：活动 + 精神要旨 + 要点 + 金句 + 参政议政切口（不贴 sohu 链）。"""
     theme = it.get("theme") or "综合"
     who = (it.get("leader") or "").strip()
     title = _item_title(it)
@@ -923,13 +1095,17 @@ def _append_item_detail(
     head += title
     lines.append(head)
 
+    spirit = _clean_space(it.get("spirit") or "")
+    if spirit:
+        lines.append(f"精神要旨：{spirit}")
+
     body = _item_brief_line(it, max_chars=brief_max)
     if body:
-        lines.append(f"摘要：{body}")
+        lines.append(f"活动概要：{body}")
 
     points = [p for p in (it.get("points") or []) if _clean_space(p)][:n_points]
     if points:
-        lines.append("要点：")
+        lines.append("部署要点：")
         for p in points:
             p = _clean_space(p)
             if p[-1] not in "。．！？!?":
@@ -939,7 +1115,6 @@ def _append_item_detail(
     raw_q = list(it.get("gold_quotes") or []) + list(it.get("phrases") or [])
     raw_q = [q for q in raw_q if not _is_scene_sentence(q)]
     quotes = _filter_full_phrases(raw_q, MAX_QUOTE_LEN, n_quotes)
-    # 若条目级金句不足，用 points 里短句补（仍排除场景叙述）
     if len(quotes) < n_quotes:
         for p in points:
             q = _display_phrase(p)
@@ -952,11 +1127,15 @@ def _append_item_detail(
             if len(quotes) >= n_quotes:
                 break
     if quotes:
-        lines.append("金句：")
+        lines.append("重要表述：")
         for q in quotes:
             lines.append(f"· {q}")
 
-    url = (it.get("url") or "").strip()
+    cut = _clean_space(it.get("policy_cut") or "")
+    if cut:
+        lines.append(f"参政议政切口：{cut if cut.endswith('。') else cut + '。'}")
+
+    url = _public_url(it.get("url") or "")
     if url:
         lines.append(f"原文：{url}")
     lines.append("")
@@ -977,11 +1156,9 @@ def _append_level_block(
     n_news: int,
     brief_max: int,
     omit_if_empty: bool = False,
+    focus_lines: Optional[List[str]] = None,
 ) -> None:
-    """政务体：某层面 = 关键词 + 重要表述 + 分条详情（附链接）。
-
-    omit_if_empty=True 时：无新增则整节不写（避免用旧闻填中央）。
-    """
+    """参政议政体：关键词 → 重要表述 → 关注点变化 → 精神与活动 → 建言切口。"""
     if not items and omit_if_empty:
         return
 
@@ -1019,16 +1196,19 @@ def _append_level_block(
         lines.append("本期暂无。")
     lines.append("")
 
-    if chg_show:
-        lines.append("（三）新提法与变化")
-        for i, c in enumerate(chg_show, 1):
+    # 关注点变化（相对近七日）优先于零散「新提法」列表
+    fl = [x for x in (focus_lines or []) if x] or [
+        c if c.endswith("。") else f"{c}。" for c in chg_show
+    ]
+    lines.append("（三）关注点与信号变化")
+    if fl:
+        for i, c in enumerate(fl[:4], 1):
             lines.append(f"{i}. {c}")
-        lines.append("")
-        abs_title = "（四）动态详情"
     else:
-        abs_title = "（三）动态详情"
+        lines.append("1. 相对近七日，主轴延续，暂未识别显著转向。")
+    lines.append("")
 
-    lines.append(abs_title)
+    lines.append("（四）精神要旨与活动要情")
     lines.append("")
     news = items[:n_news]
     for i, it in enumerate(news, 1):
@@ -1048,18 +1228,16 @@ def build_push_markdown(
     sh_signals: Dict[str, Any],
     hot_txt: str,
     site: str,
+    sh_focus_lines: Optional[List[str]] = None,
+    central_focus_lines: Optional[List[str]] = None,
 ) -> str:
-    """政务体简报：只写报告日新增；上海优先；中央无新增则省略；不回放旧闻/周观察。
-
-    注意：标题只出现在飞书卡片/消息头，正文不再重复写刊头标题。
-    """
+    """参政议政动态简报：精神/关注点变化/建言切口；不贴 sohu 链。"""
 
     period = _period_label()
     date_cn = _ymd_cn(maxd)
     c_date_cn = _ymd_cn(central_date) if central_date else ""
     _, _, issue = _brief_heading(maxd)
 
-    # 中央仅当日
     c_items = central_items if (central_items and central_date == maxd) else []
     c_signals = central_signals if c_items else {}
 
@@ -1083,7 +1261,6 @@ def build_push_markdown(
             overview,
             "",
         ]
-        # 上海优先（用户最关心市委领导最新活动）
         sec_sh = "二"
         sec_c = "三"
         _append_level_block(
@@ -1099,6 +1276,7 @@ def build_push_markdown(
             n_chg=n_schg,
             n_news=n_snews,
             brief_max=brief_max,
+            focus_lines=sh_focus_lines,
         )
         if c_items:
             _append_level_block(
@@ -1114,6 +1292,7 @@ def build_push_markdown(
                 n_chg=n_cchg,
                 n_news=n_cnews,
                 brief_max=brief_max,
+                focus_lines=central_focus_lines,
             )
         else:
             lines.append(f"**{sec_c}、中央层面**")
@@ -1121,15 +1300,18 @@ def build_push_markdown(
             lines.append("")
 
         lines.append("**【编校说明】**")
-        lines.append("仅汇总报告日公开新增信号；具体表述以权威原文为准。")
+        lines.append(
+            "本文稿服务民盟参政议政研判，提炼公开活动精神与关注点变化及建言切口；"
+            "具体表述以权威原文为准。"
+        )
         if site:
             lines.append(f"专栏网页：{site}")
         return "\n".join(lines).strip()
 
     plans = [
-        (4, 3, 2, 6, 4, 2, MAX_CENTRAL_NEWS, MAX_SH_NEWS, 200),
-        (3, 2, 1, 5, 3, 2, 2, 4, 160),
-        (2, 2, 1, 4, 2, 1, 1, 3, 140),
+        (4, 3, 2, 6, 4, 2, MAX_CENTRAL_NEWS, MAX_SH_NEWS, 220),
+        (3, 2, 1, 5, 3, 2, 2, 4, 180),
+        (2, 2, 1, 4, 2, 1, 1, 3, 150),
         (2, 1, 0, 3, 2, 1, 1, 2, 120),
     ]
     body = assemble(*plans[0])
@@ -1154,6 +1336,8 @@ def build_archive_md(
     week_phrases: int,
     hot_txt: str,
     site: str,
+    sh_focus_lines: Optional[List[str]] = None,
+    central_focus_lines: Optional[List[str]] = None,
 ) -> str:
     period = _period_label()
     issue = _issue_no(maxd, period)
@@ -1174,7 +1358,6 @@ def build_archive_md(
     ]
     kws = sh_signals.get("keywords") or []
     quotes = sh_signals.get("gold_quotes") or []
-    chg = sh_signals.get("change_words") or []
     if kws:
         lines.append("### （一）关键词")
         lines.append("、".join(kws) + "。")
@@ -1184,12 +1367,15 @@ def build_archive_md(
         for i, q in enumerate(quotes, 1):
             lines.append(f"{i}. {q}")
         lines.append("")
-    if chg:
-        lines.append("### （三）新提法与变化")
-        for c in chg:
+    lines.append("### （三）关注点与信号变化")
+    fl = sh_focus_lines or []
+    if fl:
+        for c in fl:
             lines.append(f"- {c}")
-        lines.append("")
-    lines.append("### 动态详情")
+    else:
+        lines.append("- 相对近七日，主轴延续，暂未识别显著转向。")
+    lines.append("")
+    lines.append("### （四）精神要旨与活动要情")
     lines.append("")
     if sh_items:
         for n, i in enumerate(sh_items, 1):
@@ -1217,7 +1403,11 @@ def build_archive_md(
             for i, q in enumerate(cq, 1):
                 lines.append(f"{i}. {q}")
             lines.append("")
-        lines.append("### 动态详情")
+        lines.append("### （三）关注点与信号变化")
+        for c in (central_focus_lines or []) or ["相对近七日，主轴延续。"]:
+            lines.append(f"- {c}")
+        lines.append("")
+        lines.append("### （四）精神要旨与活动要情")
         lines.append("")
         for n, i in enumerate(c_items, 1):
             _append_item_detail(
@@ -1229,7 +1419,10 @@ def build_archive_md(
 
     lines.append("## 编校说明")
     lines.append("")
-    lines.append("仅汇总报告日公开新增信号；具体表述与政策口径以权威原文为准。")
+    lines.append(
+        "本文稿服务民盟参政议政研判，提炼公开活动精神、关注点变化与建言切口；"
+        "具体表述与政策口径以权威原文为准。"
+    )
     lines.append("")
     lines.append(f"专栏网页：{site}")
     return "\n".join(lines)
@@ -1360,6 +1553,10 @@ def main() -> None:
     central_signals = build_day_signals(
         central_items, week_central, hist=hist_all, chrono=chrono
     )
+    sh_focus_lines = _focus_shift_lines(sh_items, week_sh, maxd=maxd)
+    central_focus_lines = _focus_shift_lines(
+        central_items, week_central, maxd=maxd
+    ) if central_items else []
 
     overview = _day_overview_dual(
         maxd,
@@ -1368,10 +1565,10 @@ def main() -> None:
         sh_items=sh_items,
     )
     summary = overview
-    if central_signals.get("gold_quotes"):
-        summary += f" 中央重要表述：{'；'.join(central_signals['gold_quotes'][:2])}。"
+    if sh_focus_lines:
+        summary += " " + sh_focus_lines[0]
     if sh_signals.get("gold_quotes"):
-        summary += f" 上海重要表述：{'；'.join(sh_signals['gold_quotes'][:2])}。"
+        summary += f" 重要表述：{'；'.join(sh_signals['gold_quotes'][:2])}。"
 
     site = os.environ.get("FEISHU_SITE_URL", SITE_DEFAULT).strip() or SITE_DEFAULT
     push_body = build_push_markdown(
@@ -1384,6 +1581,8 @@ def main() -> None:
         sh_signals=sh_signals,
         hot_txt=hot_txt,
         site=site,
+        sh_focus_lines=sh_focus_lines,
+        central_focus_lines=central_focus_lines,
     )
     title, _, issue = _brief_heading(maxd)
 
@@ -1438,6 +1637,8 @@ def main() -> None:
         week_phrases=week_phrases,
         hot_txt=hot_txt,
         site=site,
+        sh_focus_lines=sh_focus_lines,
+        central_focus_lines=central_focus_lines,
     )
     open(os.path.join(BRIEF_DIR, f"{maxd}.md"), "w", encoding="utf-8").write(md_text)
 
