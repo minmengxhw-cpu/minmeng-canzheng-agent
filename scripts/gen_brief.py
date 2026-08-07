@@ -1169,6 +1169,12 @@ def _append_level_block(
 
     if not items:
         lines.append(empty_note)
+        fl_empty = [x for x in (focus_lines or []) if x]
+        if fl_empty:
+            lines.append("")
+            lines.append("（关注点与近七日主轴）")
+            for i, c in enumerate(fl_empty[:4], 1):
+                lines.append(f"{i}. {c}")
         lines.append("")
         return
 
@@ -1495,30 +1501,31 @@ def main() -> None:
         print("brief: 无 leaders / central 数据")
         return
 
-    # 报告日：优先上海最新日；无上海则用中央最新日
-    maxd = max(
+    # 报告日：默认日历今天（可用 CZ_BRIEF_REPORT_DATE 覆盖）
+    # 避免「数据最新日停在几天前」时反复把旧日内容当今日日报重推
+    data_max = max(
         ([s["date"] for s in sh_data] or ["1970-01-01"])
         + ([s["date"] for s in central_data] or ["1970-01-01"])
     )
-    if sh_data:
-        maxd = max(s["date"] for s in sh_data)
+    report_date = (os.environ.get("CZ_BRIEF_REPORT_DATE") or "").strip()
+    if not re.fullmatch(r"20\d{2}-\d{2}-\d{2}", report_date or ""):
+        report_date = datetime.date.today().isoformat()
+    maxd = report_date
 
     chrono = _load_phrase_counts()
     hist_all = _build_history_phrase_index(sh_data + central_data, maxd)
 
-    # —— 上海：仅报告日当日新增 ——
+    # —— 上海 / 中央：仅报告日当日新增（不回填旧日活动当今日）——
     sh_raw = [s for s in sh_data if s["date"] == maxd]
     sh_raw.sort(
         key=lambda s: (s.get("role_rank", 9), s.get("leader", ""), s.get("headline", ""))
     )
     sh_items = build_structured_items(sh_raw, hist=hist_all, chrono=chrono)
 
-    # —— 中央：仅报告日当日新增；绝不回填往日旧闻 ——
     central_date = ""
     central_raw: List[dict] = [s for s in central_data if s["date"] == maxd]
     if central_raw:
         central_date = maxd
-    # 可选：显式允许回看（兼容旧 env）；默认 0 = 不回看
     lookback = int(os.environ.get("CENTRAL_LOOKBACK_DAYS", str(CENTRAL_LOOKBACK_DAYS)))
     if not central_raw and lookback > 0:
         since_c = dminus(maxd, lookback)
@@ -1531,15 +1538,14 @@ def main() -> None:
             central_raw = [s for s in central_data if s["date"] == central_date]
     central_raw.sort(key=lambda s: (s.get("headline", "")))
     central_items = build_structured_items(central_raw, hist=hist_all, chrono=chrono)
-    # 再保险：非当日中央不进推送结构
     if central_date and central_date != maxd and lookback <= 0:
         central_items = []
         central_date = ""
         central_raw = []
 
     since = dminus(maxd, 6)
-    week_sh = [s for s in sh_data if s["date"] >= since]
-    week_central = [s for s in central_data if s["date"] >= since]
+    week_sh = [s for s in sh_data if since <= s["date"] <= maxd]
+    week_central = [s for s in central_data if since <= s["date"] <= maxd]
     week_phrases = sum(len(np_of(s)) for s in week_sh)
     theme_cnt: Dict[str, int] = {}
     for s in week_sh:
@@ -1553,10 +1559,28 @@ def main() -> None:
     central_signals = build_day_signals(
         central_items, week_central, hist=hist_all, chrono=chrono
     )
-    sh_focus_lines = _focus_shift_lines(sh_items, week_sh, maxd=maxd)
-    central_focus_lines = _focus_shift_lines(
-        central_items, week_central, maxd=maxd
-    ) if central_items else []
+    # 有今日新增：对比近七日变化；无今日新增：仍给近七日主轴，供日更“必有一报”
+    if sh_items:
+        sh_focus_lines = _focus_shift_lines(sh_items, week_sh, maxd=maxd)
+    else:
+        sh_focus_lines = [
+            f"今日上海书记/市长公开通道无新增调研讲话通稿；数据最新日 {data_max}。",
+            f"近七日上海主题主轴：{hot_txt}。",
+        ]
+        # 点出近七日最新一条的精神，避免“空报”
+        latest_week = sorted(week_sh, key=lambda x: x.get("date", ""), reverse=True)
+        if latest_week:
+            lw = latest_week[0]
+            sh_focus_lines.append(
+                f"最近一次公开活动（{lw.get('date')} {lw.get('leader') or ''}）："
+                f"{(lw.get('headline') or lw.get('occasion') or '')[:48]}，"
+                f"主题{(lw.get('theme') or '综合')}。"
+            )
+    central_focus_lines = (
+        _focus_shift_lines(central_items, week_central, maxd=maxd)
+        if central_items
+        else []
+    )
 
     overview = _day_overview_dual(
         maxd,
@@ -1564,6 +1588,11 @@ def main() -> None:
         central_date=central_date,
         sh_items=sh_items,
     )
+    if not sh_items and not central_items:
+        overview = (
+            f"{_ymd_cn(maxd)}中央与上海公开通道均无新增调研/讲话通稿。"
+            f"近七日上海主轴为{hot_txt}，请持续跟踪书记市长与中央公开信号落地节奏。"
+        )
     summary = overview
     if sh_focus_lines:
         summary += " " + sh_focus_lines[0]
@@ -1588,6 +1617,7 @@ def main() -> None:
 
     brief = {
         "date": maxd,
+        "data_max_date": data_max,
         "issue": issue,
         "period": _period_label(),
         "generated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -1607,7 +1637,6 @@ def main() -> None:
             "signals": sh_signals,
             "items": sh_items,
         },
-        # 兼容旧字段
         "signals": sh_signals,
         "today": {
             "n_signals": len(sh_items),
@@ -1642,17 +1671,21 @@ def main() -> None:
     )
     open(os.path.join(BRIEF_DIR, f"{maxd}.md"), "w", encoding="utf-8").write(md_text)
 
+    # 每日平台：有新增必推；无新增在 FEISHU_PUSH_ALWAYS=1（日更默认）时仍推
     has_signal = bool(sh_items or central_items)
     _push_feishu(title, push_body, has_signal)
     _push_legacy_webhook(md_text, has_signal)
 
     if "…" in push_body or "..." in push_body:
         print("brief: WARN 推送正文含省略号，请检查生成逻辑")
+    if "sohu.com" in push_body.lower():
+        print("brief: WARN 推送正文仍含 sohu 链接，应已屏蔽")
     print(f"brief: {overview}")
     print("--- push preview ---")
     print(push_body)
     print(
         f"--- chars: {len(push_body)} | ellipsis={('…' in push_body) or ('...' in push_body)} "
+        f"| report={maxd} data_max={data_max} "
         f"| central={len(central_items)}@{central_date or '-'} | sh={len(sh_items)} ---"
     )
 

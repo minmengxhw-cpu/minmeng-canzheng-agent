@@ -129,33 +129,67 @@ else
   wrn "无 lark-cli，跳过群权限检查"
 fi
 
-# 6) 今日 08:30 是否跑过
+# 6) 今日 08:30 是否跑过且推送
 echo "[6] 今日定时执行日志"
 TODAY=$(date +%Y-%m-%d)
 if [[ -f "$OUT_LOG" ]]; then
-  if rg -q "自动更新开始：${TODAY}T08:30|执行引擎: Grok|执行引擎: MiniMax|${TODAY}T08:3" "$OUT_LOG" 2>/dev/null \
-     || rg -q "${TODAY}T08:30" "$OUT_LOG" 2>/dev/null; then
-    ok "日志出现今日 08:30 相关记录"
+  # 必须出现「今日」自动更新开始，不能用历史「执行引擎」行误报
+  if rg -q "自动更新开始：${TODAY}T08:3" "$OUT_LOG" 2>/dev/null; then
+    ok "日志出现今日 08:30 流水线启动：自动更新开始：${TODAY}T08:3x"
+  elif rg -q "开始流水线.*report_date=${TODAY}|开始流水线（MiniMax→Grok|开始流水线（采集" "$OUT_LOG" 2>/dev/null \
+    && rg -q "${TODAY}" <(tail -c 20000 "$OUT_LOG" 2>/dev/null); then
+    # 兼容新脚本在 fetch 前打印「开始流水线」
+    if tail -c 30000 "$OUT_LOG" | rg -q "开始流水线"; then
+      # 进一步：mtime 是否为今天
+      if [[ "$(date -r "$OUT_LOG" +%F 2>/dev/null || true)" == "$TODAY" ]]; then
+        ok "今日 out 日志有更新且含开始流水线"
+      else
+        bad "未见今日 08:30 完整启动标记"
+      fi
+    fi
   else
-    # 若当前时间还没到 08:30，warn；已过则 fail
     HOUR=$(date +%H)
     MIN=$(date +%M)
     if [[ "$HOUR" -lt 8 || ( "$HOUR" -eq 8 && "$MIN" -lt 35 ) ]]; then
       wrn "尚未到/刚过 08:30，今日日志可暂无"
     else
-      bad "今日 08:30 未见成功启动日志 — 可能漏跑"
+      bad "今日 08:30 未见「自动更新开始：${TODAY}T08:3x」— 可能 git 阶段失败或漏跑"
     fi
   fi
-  if rg -q "已主动推送飞书" "$OUT_LOG" 2>/dev/null; then
-    LAST_PUSH=$(rg -n "已主动推送飞书" "$OUT_LOG" | tail -1)
-    ok "曾有飞书推送记录: ${LAST_PUSH:0:100}"
+  # 今日推送：在今日相关段落内找「已主动推送」，避免历史误报
+  if python3 - <<PY
+from pathlib import Path
+import re
+p=Path("$OUT_LOG")
+t=p.read_text(errors="replace")
+# 取最后一个「自动更新开始：TODAY」之后的文本
+key="自动更新开始：${TODAY}T"
+idx=t.rfind(key)
+chunk=t[idx:] if idx>=0 else ""
+# 也接受今日 mtime 且末尾 8KB 内有推送+今日
+if "已主动推送飞书" in chunk:
+    raise SystemExit(0)
+tail=t[-12000:]
+if "${TODAY}" in tail and "已主动推送飞书" in tail and "自动更新开始：${TODAY}" in t:
+    raise SystemExit(0)
+raise SystemExit(1)
+PY
+  then
+    ok "今日流水线段落内已出现「已主动推送飞书」"
   else
-    wrn "out 日志中未见「已主动推送飞书」"
+    HOUR=$(date +%H)
+    if [[ "$HOUR" -lt 8 || ( "$HOUR" -eq 8 && "$MIN" -lt 40 ) ]]; then
+      wrn "今日尚无飞书推送记录（或尚未到推送完成窗口）"
+    else
+      bad "今日未见飞书推送成功日志 — 查 launchd.out/err"
+    fi
   fi
-  if [[ -f "$ERR_LOG" ]] && rg -q "Aborting|would be overwritten by merge" "$ERR_LOG" 2>/dev/null; then
-    # only warn if recent
+  if [[ -f "$ERR_LOG" ]]; then
+    if tail -c 8000 "$ERR_LOG" | rg -q "Could not resolve host: github.com|fatal: unable to access"; then
+      wrn "err 近期含 github 解析/访问失败 — 新脚本应不阻断日更，请确认已 install_launchd"
+    fi
     if rg -q "$(date +%Y-%m-%d)" "$ERR_LOG" && rg -q "Aborting|overwritten by merge" "$ERR_LOG"; then
-      wrn "err 日志含 git merge Aborting — 核对 update_and_push 是否已含 hard reset 兜底"
+      wrn "err 日志含 git merge Aborting"
     fi
   fi
 else
@@ -169,6 +203,8 @@ if echo "$LE" | rg -q "last exit code = 0"; then
   ok "$LE"
 elif echo "$LE" | rg -q "never exited"; then
   wrn "$LE"
+elif echo "$LE" | rg -q "last exit code = 128"; then
+  bad "$LE — 多为 git fatal；新版应已隔离 git 失败，请重装 launchd 后观察明日"
 elif echo "$LE" | rg -q "last exit code = 1"; then
   bad "$LE — 上次失败，查 launchd.err.log"
 else

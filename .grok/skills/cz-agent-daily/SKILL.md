@@ -68,14 +68,16 @@ FEISHU_SITE_URL=https://minmengxhw-cpu.github.io/minmeng-canzheng-agent/
 launchd 08:30
   → update_and_push.sh
       → 校验 mmx（主）+ grok（回退）
-      → git fetch + merge（失败则 hard reset origin/main，避免脏 scripts 漏发）
+      → git fetch/merge（失败只 WARN，绝不阻断日更）  # 2026-08 起
       → update_all.py
-            → fetch_central.py   # MiniMax→Grok / 规则兜底
-            → fetch_leaders.py   # MiniMax→Grok / 规则兜底
-            → gen_brief.py       # 唯一推送点 → 外部群
+            → fetch_central.py   # MiniMax→Grok / 规则兜底；失败不阻断简报
+            → fetch_leaders.py   # 同上
+            → gen_brief.py       # 唯一推送点 → 外部群（日历今日报告日）
             → gen_cuts.py
-      → 有数据变化则 git commit/push
+      → git commit/push（失败只 WARN）
 ```
+
+**交付铁律：** 市领导/中央公开调研与讲话的 **精神要旨、关注重点、信号变化、参政议政切口**；无新增也要出「今日无新增 + 近七日主轴」日更（`FEISHU_PUSH_ALWAYS=1`）。
 
 ## 简报格式（定稿，服务参政议政）
 

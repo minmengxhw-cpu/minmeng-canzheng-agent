@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # 日更入口（launchd 仅 08:30，不发晚报）
-# 分析：优先 MiniMax（mmx · MiniMax-M3），额度不足回退 Grok Build（grok · grok-4.5）
-set -euo pipefail
+# 铁律：飞书简报推送优先于 git 同步；git 网络失败不得阻断日更。
+# 分析：优先 MiniMax（mmx），额度不足回退 Grok Build（grok）
+set -u
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+
+PIPELINE_RC=0
 
 # 加载本地密钥（飞书等），不要提交仓库
 for envf in \
@@ -38,11 +41,16 @@ export GROK_TIMEOUT="${GROK_TIMEOUT:-240}"
 export GROK_PERMISSION_MODE="${GROK_PERMISSION_MODE:-bypassPermissions}"
 export LLM_ENGINE="${LLM_ENGINE:-auto}"
 export LLM_FALLBACK="${LLM_FALLBACK:-1}"
+# 重要平台：默认每日必推一封（无新增也推「今日无新增+近七日主轴」）
+export FEISHU_PUSH_ALWAYS="${FEISHU_PUSH_ALWAYS:-1}"
+# 报告日用日历今天，避免反复重推旧报告日
+export CZ_BRIEF_REPORT_DATE="${CZ_BRIEF_REPORT_DATE:-$(date +%F)}"
+export CZ_BRIEF_PERIOD="${CZ_BRIEF_PERIOD:-早报}"
 
 HAS_MMX=0
 HAS_GROK=0
-[[ -x "$MINIMAX_CLI" ]] && HAS_MMX=1
-[[ -x "$GROK_CLI" ]] && HAS_GROK=1
+[[ -x "${MINIMAX_CLI:-}" ]] && HAS_MMX=1
+[[ -x "${GROK_CLI:-}" ]] && HAS_GROK=1
 
 if [[ "$HAS_MMX" -eq 0 && "$HAS_GROK" -eq 0 ]]; then
   echo "ERROR: MiniMax（mmx）与 Grok Build（grok）均不可用" >&2
@@ -62,17 +70,21 @@ else
   echo "WARN: 未找到 Grok Build，MiniMax 失败时无回退"
 fi
 
-# 运行副本常被 install_launchd rsync 弄脏 scripts/，会阻断 merge 导致整链失败、简报漏发
-git fetch origin main
-if ! git merge --ff-only origin/main; then
-  echo "WARN: git merge --ff-only 失败，对齐 origin/main 后继续（避免漏推飞书）"
-  git reset --hard origin/main
-  git clean -fd --exclude=data/logs --exclude=.env --exclude='.env.*' || true
+# —— git 同步：失败只告警，绝不阻断抓取/简报/飞书 ——
+echo "git: 尝试同步 origin/main（失败不阻断日更）"
+if git fetch origin main 2>&1; then
+  if ! git merge --ff-only origin/main 2>&1; then
+    echo "WARN: git merge --ff-only 失败，对齐 origin/main 后继续（避免脏 scripts）"
+    git reset --hard origin/main 2>&1 || echo "WARN: git reset 失败，继续用当前工作副本"
+    git clean -fd --exclude=data/logs --exclude=.env --exclude='.env.*' 2>&1 || true
+  fi
+else
+  echo "WARN: git fetch 失败（常见 DNS/github 不可达），跳过代码同步，继续日更流水线" >&2
 fi
 
-SINCE="$(date -v-7d +%F)"
-echo "开始流水线（MiniMax→Grok 分析 → 简报 → 飞书外部群） since=$SINCE"
-# max-pages：上观腾讯约 20 条/页；过小会漏掉书记市长通稿
+SINCE="$(date -v-7d +%F 2>/dev/null || date -d '7 days ago' +%F)"
+echo "开始流水线（采集→分析→简报→飞书） since=$SINCE report_date=$CZ_BRIEF_REPORT_DATE"
+set +e
 MINIMAX_CLI="$MINIMAX_CLI" \
 MINIMAX_MODEL="$MINIMAX_MODEL" \
 MINIMAX_TIMEOUT="$MINIMAX_TIMEOUT" \
@@ -82,17 +94,32 @@ GROK_TIMEOUT="$GROK_TIMEOUT" \
 GROK_PERMISSION_MODE="$GROK_PERMISSION_MODE" \
 LLM_ENGINE="$LLM_ENGINE" \
 LLM_FALLBACK="$LLM_FALLBACK" \
+FEISHU_PUSH_ALWAYS="$FEISHU_PUSH_ALWAYS" \
+CZ_BRIEF_REPORT_DATE="$CZ_BRIEF_REPORT_DATE" \
+CZ_BRIEF_PERIOD="$CZ_BRIEF_PERIOD" \
   python3 scripts/update_all.py --since "$SINCE" --max-pages 12 --skip-drafts
+PIPELINE_RC=$?
+set -e
 
-# 简报生成与飞书推送已在 update_all.py → gen_brief.py 完成，勿再调一次，否则会重复推送
-
-git add data/*.json briefs/*.md
-if git diff --cached --quiet; then
-  echo "没有新的数据变化（简报/推送已在流水线内完成）"
-  exit 0
+if [[ "$PIPELINE_RC" -ne 0 ]]; then
+  echo "ERROR: update_all 退出码=$PIPELINE_RC（仍尝试落盘 git，不掩盖失败）" >&2
 fi
 
-git config user.name "minmeng-data-bot"
-git config user.email "minmeng-data-bot@users.noreply.github.com"
-git commit -m "refresh data $(date +%F)"
-git push origin main
+# 简报生成与飞书推送已在 update_all.py → gen_brief.py 完成，勿再调一次
+
+# —— 数据回写 git：失败不改变流水线成败 ——
+set +e
+git add data/*.json briefs/*.md 2>/dev/null
+if git diff --cached --quiet 2>/dev/null; then
+  echo "没有新的数据变化需要 commit"
+else
+  git config user.name "minmeng-data-bot"
+  git config user.email "minmeng-data-bot@users.noreply.github.com"
+  git commit -m "refresh data $(date +%F)" 2>&1 || true
+  if ! git push origin main 2>&1; then
+    echo "WARN: git push 失败（不影响已推飞书），下次再试" >&2
+  fi
+fi
+set -e
+
+exit "$PIPELINE_RC"
