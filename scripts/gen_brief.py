@@ -1501,15 +1501,15 @@ def main() -> None:
         print("brief: 无 leaders / central 数据")
         return
 
-    # 报告日：默认日历今天（可用 CZ_BRIEF_REPORT_DATE 覆盖）
-    # 避免「数据最新日停在几天前」时反复把旧日内容当今日日报重推
+    # 报告日：默认「昨天」（早报讲昨日活动）；可用 CZ_BRIEF_REPORT_DATE 覆盖
+    # 有新增 = 报告日（昨日）库内有书记/市长或中央通稿，不是日历今天
     data_max = max(
         ([s["date"] for s in sh_data] or ["1970-01-01"])
         + ([s["date"] for s in central_data] or ["1970-01-01"])
     )
     report_date = (os.environ.get("CZ_BRIEF_REPORT_DATE") or "").strip()
     if not re.fullmatch(r"20\d{2}-\d{2}-\d{2}", report_date or ""):
-        report_date = datetime.date.today().isoformat()
+        report_date = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
     maxd = report_date
 
     chrono = _load_phrase_counts()
@@ -1564,7 +1564,7 @@ def main() -> None:
         sh_focus_lines = _focus_shift_lines(sh_items, week_sh, maxd=maxd)
     else:
         sh_focus_lines = [
-            f"今日上海书记/市长公开通道无新增调研讲话通稿；数据最新日 {data_max}。",
+            f"报告日（{_ymd_cn(maxd)}）上海书记/市长公开通道无新增调研讲话通稿；库内数据最新日 {data_max}。",
             f"近七日上海主题主轴：{hot_txt}。",
         ]
         # 点出近七日最新一条的精神，避免“空报”

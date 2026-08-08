@@ -41,10 +41,14 @@ export GROK_TIMEOUT="${GROK_TIMEOUT:-240}"
 export GROK_PERMISSION_MODE="${GROK_PERMISSION_MODE:-bypassPermissions}"
 export LLM_ENGINE="${LLM_ENGINE:-auto}"
 export LLM_FALLBACK="${LLM_FALLBACK:-1}"
-# 重要平台：默认每日必推一封（无新增也推「今日无新增+近七日主轴」）
+# 重要平台：默认每日必推一封（无新增也推「报告日无新增+近七日主轴」）
 export FEISHU_PUSH_ALWAYS="${FEISHU_PUSH_ALWAYS:-1}"
-# 报告日用日历今天，避免反复重推旧报告日
-export CZ_BRIEF_REPORT_DATE="${CZ_BRIEF_REPORT_DATE:-$(date +%F)}"
+# 早报逻辑：今天 08:30 讲「昨天」的市领导/中央公开活动（T-1）
+# 有新增=报告日（昨日）有新增，不是日历今天零点后的通稿
+if [[ -z "${CZ_BRIEF_REPORT_DATE:-}" ]]; then
+  CZ_BRIEF_REPORT_DATE="$(date -v-1d +%F 2>/dev/null || date -d 'yesterday' +%F)"
+fi
+export CZ_BRIEF_REPORT_DATE
 export CZ_BRIEF_PERIOD="${CZ_BRIEF_PERIOD:-早报}"
 
 HAS_MMX=0

@@ -37,7 +37,7 @@ common_env = {
     "GROK_PERMISSION_MODE": "bypassPermissions",
     "LLM_ENGINE": "auto",
     "LLM_FALLBACK": "1",
-    # 日更必推；报告日用日历日（由 update_and_push 每次覆盖也可）
+    # 日更必推；报告日默认 T-1（由 update_and_push 每次设 CZ_BRIEF_REPORT_DATE）
     "FEISHU_PUSH_ALWAYS": "1",
 }
 # 从本地 .env 注入飞书 Webhook（不写进仓库）
