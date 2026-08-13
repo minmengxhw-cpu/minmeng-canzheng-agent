@@ -72,7 +72,7 @@ launchd 08:30
       → update_all.py
             → fetch_central.py   # MiniMax→Grok / 规则兜底；失败不阻断简报
             → fetch_leaders.py   # 同上
-            → gen_brief.py       # 唯一推送点 → 外部群（日历今日报告日）
+            → gen_brief.py       # 唯一推送点 → 外部群（报告日=昨天 T-1）
             → gen_cuts.py
       → git commit/push（失败只 WARN）
 ```
@@ -162,6 +162,9 @@ RUNTIME="$HOME/Library/Application Support/minmeng-canzheng-agent"
 set -a; source "$RUNTIME/.env"; set +a
 export FEISHU_CHAT_ID=oc_381bea46653394d135daf14739524904
 unset FEISHU_WEBHOOK BRIEF_WEBHOOK
+export CZ_BRIEF_REPORT_DATE="$(date -v-1d +%F)"
+export CZ_BRIEF_PERIOD=早报
+export FEISHU_PUSH_ALWAYS=1
 cd "$RUNTIME" && python3 scripts/gen_brief.py
 ```
 

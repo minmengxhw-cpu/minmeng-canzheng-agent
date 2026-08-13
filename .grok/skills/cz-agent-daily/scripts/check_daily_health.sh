@@ -30,10 +30,10 @@ else
   bad "缺少 $PLIST — 请 bash scripts/install_launchd.sh"
 fi
 
-# 2) 仅 08:30
+# 2) 仅 08:30（不得用 || true 吞掉 python 失败码，否则永远 PASS）
 echo "[2] 定时仅 08:30"
 if [[ -f "$PLIST" ]]; then
-  python3 - <<'PY' || true
+  if python3 - <<'PY'
 import plistlib, sys
 from pathlib import Path
 p = Path.home() / "Library/LaunchAgents/com.minmeng.canzheng-agent.plist"
@@ -43,12 +43,11 @@ if isinstance(sched, dict):
     sched = [sched]
 ok_s = [{"Hour": 8, "Minute": 30}]
 if sched == ok_s:
-    print("PASS")
-else:
-    print("FAIL", sched)
-    sys.exit(1)
+    sys.exit(0)
+print("FAIL", sched)
+sys.exit(1)
 PY
-  if [[ $? -eq 0 ]]; then
+  then
     ok "StartCalendarInterval = 仅 08:30"
   else
     bad "定时不是仅 08:30 — 禁止晚报/双时段"
@@ -132,6 +131,8 @@ fi
 # 6) 今日 08:30 是否跑过且推送
 echo "[6] 今日定时执行日志"
 TODAY=$(date +%Y-%m-%d)
+HOUR=$(date +%H)
+MIN=$(date +%M)
 if [[ -f "$OUT_LOG" ]]; then
   # 必须出现「今日」自动更新开始，不能用历史「执行引擎」行误报
   if rg -q "自动更新开始：${TODAY}T08:3" "$OUT_LOG" 2>/dev/null; then
@@ -148,12 +149,10 @@ if [[ -f "$OUT_LOG" ]]; then
       fi
     fi
   else
-    HOUR=$(date +%H)
-    MIN=$(date +%M)
     if [[ "$HOUR" -lt 8 || ( "$HOUR" -eq 8 && "$MIN" -lt 35 ) ]]; then
       wrn "尚未到/刚过 08:30，今日日志可暂无"
     else
-      bad "今日 08:30 未见「自动更新开始：${TODAY}T08:3x」— 可能 git 阶段失败或漏跑"
+      bad "今日 08:30 未见「自动更新开始：${TODAY}T08:3x」— 可能漏跑"
     fi
   fi
   # 今日推送：在今日相关段落内找「已主动推送」，避免历史误报
@@ -177,7 +176,6 @@ PY
   then
     ok "今日流水线段落内已出现「已主动推送飞书」"
   else
-    HOUR=$(date +%H)
     if [[ "$HOUR" -lt 8 || ( "$HOUR" -eq 8 && "$MIN" -lt 40 ) ]]; then
       wrn "今日尚无飞书推送记录（或尚未到推送完成窗口）"
     else

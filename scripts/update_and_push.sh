@@ -43,6 +43,13 @@ export LLM_ENGINE="${LLM_ENGINE:-auto}"
 export LLM_FALLBACK="${LLM_FALLBACK:-1}"
 # 重要平台：默认每日必推一封（无新增也推「报告日无新增+近七日主轴」）
 export FEISHU_PUSH_ALWAYS="${FEISHU_PUSH_ALWAYS:-1}"
+# 防双通道 / 发错群
+export FEISHU_CHAT_ID="${FEISHU_CHAT_ID:-oc_381bea46653394d135daf14739524904}"
+if [[ "$FEISHU_CHAT_ID" == "oc_9334707219faab92091bdfb24344fa95" ]]; then
+  echo "ERROR: 检测到旧内部群 ID，拒绝推送" >&2
+  exit 1
+fi
+unset FEISHU_WEBHOOK BRIEF_WEBHOOK FEISHU_JOIN_URL 2>/dev/null || true
 # 早报逻辑：今天 08:30 讲「昨天」的市领导/中央公开活动（T-1）
 # 有新增=报告日（昨日）有新增，不是日历今天零点后的通稿
 if [[ -z "${CZ_BRIEF_REPORT_DATE:-}" ]]; then
@@ -75,12 +82,25 @@ else
 fi
 
 # —— git 同步：失败只告警，绝不阻断抓取/简报/飞书 ——
+# 对抗点：reset --hard 会抹掉未推送的 data/briefs，必须先保全
 echo "git: 尝试同步 origin/main（失败不阻断日更）"
 if git fetch origin main 2>&1; then
   if ! git merge --ff-only origin/main 2>&1; then
-    echo "WARN: git merge --ff-only 失败，对齐 origin/main 后继续（避免脏 scripts）"
+    echo "WARN: git merge --ff-only 失败，对齐 origin/main（保全 data/briefs）"
+    STASH_DIR="$(mktemp -d /tmp/cz-data-XXXXXX)"
+    cp -a data "$STASH_DIR/data" 2>/dev/null || true
+    cp -a briefs "$STASH_DIR/briefs" 2>/dev/null || true
     git reset --hard origin/main 2>&1 || echo "WARN: git reset 失败，继续用当前工作副本"
     git clean -fd --exclude=data/logs --exclude=.env --exclude='.env.*' 2>&1 || true
+    if [[ -d "$STASH_DIR/data" ]]; then
+      mkdir -p data
+      rsync -a "$STASH_DIR/data/" data/ 2>/dev/null || true
+    fi
+    if [[ -d "$STASH_DIR/briefs" ]]; then
+      mkdir -p briefs
+      rsync -a "$STASH_DIR/briefs/" briefs/ 2>/dev/null || true
+    fi
+    rm -rf "$STASH_DIR"
   fi
 else
   echo "WARN: git fetch 失败（常见 DNS/github 不可达），跳过代码同步，继续日更流水线" >&2

@@ -26,6 +26,7 @@ import hmac
 import json
 import os
 import shutil
+import sys
 import subprocess
 import time
 import urllib.error
@@ -286,6 +287,18 @@ def push_text(text: str) -> Dict[str, Any]:
     }
 
 
+_FORBIDDEN_CHATS = {"oc_9334707219faab92091bdfb24344fa95"}
+_ALLOWED_CHAT = "oc_381bea46653394d135daf14739524904"
+
+
+def _guard_chat_id(chat_id: str) -> Optional[str]:
+    chat_id = (chat_id or "").strip()
+    if chat_id in _FORBIDDEN_CHATS:
+        print("feishu: 拒绝推送到旧内部群", file=sys.stderr)
+        return None
+    return chat_id or None
+
+
 def push_brief_card(
     title: str,
     summary: str,
@@ -293,7 +306,11 @@ def push_brief_card(
     item_lines: Optional[list] = None,
 ) -> Dict[str, Any]:
     site = os.environ.get("FEISHU_SITE_URL", DEFAULT_SITE).strip() or DEFAULT_SITE
+    # 日更铁律：有外部群 chat_id 时禁止走 webhook（防双通道）
+    chat_id = _guard_chat_id(os.environ.get("FEISHU_CHAT_ID", ""))
     url = os.environ.get("FEISHU_WEBHOOK", "").strip()
+    if chat_id:
+        url = ""
     if url:
         secret = os.environ.get("FEISHU_WEBHOOK_SECRET", "").strip()
         payload = build_card_payload(
@@ -301,7 +318,7 @@ def push_brief_card(
         )
         return post_webhook(url, payload)
 
-    chat_id = os.environ.get("FEISHU_CHAT_ID", "").strip()
+    chat_id = _guard_chat_id(os.environ.get("FEISHU_CHAT_ID", ""))
     if chat_id:
         md = _format_markdown(title, summary, lines=item_lines, site_url=site)
         r = post_lark_cli_chat(chat_id, markdown=md)

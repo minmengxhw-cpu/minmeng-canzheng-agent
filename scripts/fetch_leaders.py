@@ -901,9 +901,10 @@ def main() -> int:
             history = json.loads(OUT.read_text(encoding="utf-8"))
         except Exception:
             history = []
-    history = [h for h in history if looks_like_current_activity(
-        h.get("full_text", ""), h.get("date", ""), h.get("headline", "")
-    )]
+    # 已入库条目不得用启发式再删（否则每次跑会丢历史）
+    if not isinstance(history, list):
+        history = []
+    history = [h for h in history if isinstance(h, dict) and h.get("date")]
     history_urls = {h.get("url"): h for h in history if h.get("url")}
     results: List[Dict] = list(history)  # 以历史为基底，增量补充
     results_urls = set(history_urls)

@@ -74,11 +74,10 @@ def main() -> int:
         codes.append(run("生成切口初稿", "gen_drafts.py", draft_env, critical=False))
 
     print(f"\n更新完成：{datetime.now().isoformat(timespec='seconds')}", flush=True)
-    # 简报失败优先返回
+    # 飞书日更成败只看简报；采集失败已 WARN，不得把 launchd 打成失败
     if codes[2] != 0:  # gen_brief
         return codes[2]
-    hard = [c for c in codes if c != 0]
-    return hard[0] if hard else 0
+    return 0
 
 
 if __name__ == "__main__":
