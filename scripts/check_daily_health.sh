@@ -131,8 +131,9 @@ fi
 # 6) 今日 08:30 是否跑过且推送
 echo "[6] 今日定时执行日志"
 TODAY=$(date +%Y-%m-%d)
-HOUR=$(date +%H)
-MIN=$(date +%M)
+# 禁止 08 被当成八进制
+HOUR=$((10#$(date +%H)))
+MIN=$((10#$(date +%M)))
 if [[ -f "$OUT_LOG" ]]; then
   # 必须出现「今日」自动更新开始，不能用历史「执行引擎」行误报
   if rg -q "自动更新开始：${TODAY}T08:3" "$OUT_LOG" 2>/dev/null; then
