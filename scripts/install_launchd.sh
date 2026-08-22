@@ -18,7 +18,7 @@ rsync -a \
   --exclude '.env.*' \
   "$ROOT/" "$RUNTIME_ROOT/"
 
-python3 - "$RUNTIME_ROOT" "$PLIST" "$LOG_DIR" <<'PY'
+/usr/bin/python3 - "$RUNTIME_ROOT" "$PLIST" "$LOG_DIR" <<'PY'
 import os, plistlib, sys
 from pathlib import Path
 
@@ -27,17 +27,15 @@ home = Path.home()
 common_env = {
     "HOME": str(home),
     "PATH": f"{home}/.grok/bin:{home}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
-    # 主：MiniMax；回退：Grok Build
-    "MINIMAX_CLI": "/opt/homebrew/bin/mmx",
-    "MINIMAX_MODEL": "MiniMax-M3",
-    "MINIMAX_TIMEOUT": "240",
+    "PYTHON_BIN": "/usr/bin/python3",
+    # 唯一分析引擎：Grok 4.6
     "GROK_CLI": str(home / ".grok/bin/grok"),
-    "GROK_MODEL": "grok-4.5",
+    "GROK_MODEL": "grok-4.6",
     "GROK_TIMEOUT": "240",
     "GROK_PERMISSION_MODE": "bypassPermissions",
-    "LLM_ENGINE": "auto",
-    "LLM_FALLBACK": "1",
-    # 日更必推；报告日默认 T-1（由 update_and_push 每次设 CZ_BRIEF_REPORT_DATE）
+    "LLM_ENGINE": "grok",
+    "LLM_FALLBACK": "0",
+    # 两次更新均推送；报告日和早晚报由 update_and_push 动态设置
     "FEISHU_PUSH_ALWAYS": "1",
 }
 # 从本地 .env 注入飞书 Webhook（不写进仓库）
@@ -75,7 +73,8 @@ data = {
     ],
     "EnvironmentVariables": common_env,
     "StartCalendarInterval": [
-        {"Hour": 8, "Minute": 30},
+        {"Hour": 9, "Minute": 0},
+        {"Hour": 21, "Minute": 0},
     ],
     "StandardOutPath": str(log_dir / "launchd.out.log"),
     "StandardErrorPath": str(log_dir / "launchd.err.log"),
@@ -94,4 +93,4 @@ launchctl bootout "gui/$(id -u)" "$PLIST" 2>/dev/null || true
 launchctl bootout "gui/$(id -u)" "$CENTRAL_PLIST" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
 echo "旧 central-watch 任务已停用，原 plist 文件保留不删除"
-echo "已安装：每天 08:30 分析优先 MiniMax（mmx），额度不足回退 Grok Build；推送外部飞书群"
+echo "已安装：每天 09:00 / 21:00 使用 Grok 4.6 更新，并推送外部飞书群"

@@ -24,7 +24,7 @@
   python3 scripts/fetch_leaders.py                  # 默认回溯最近 180 天
   SINCE=2026-01-01 MAX_PAGES=120 python3 scripts/fetch_leaders.py   # 指定回溯
   ONLY_SECRETARY=1 python3 scripts/fetch_leaders.py # 只抓市委书记
-  # 分析引擎：优先 MiniMax（mmx），额度不足回退 Grok Build（grok）
+  # 分析引擎：Grok CLI（grok-4.6）
 """
 from __future__ import annotations
 
@@ -849,18 +849,24 @@ def analyze(headline: str, date: str, leader: str, full_text: str) -> Dict:
   "keywords": ["关注点关键词 1-6 个"],
   "policy_implications": "民盟参政议政中观切口，1-2句，60-120字，避免空话"
 }}"""
+    errors = []
     for attempt in range(2):
         try:
             result = llm_json(SYSTEM_PROMPT, user, max_tokens=1200, temperature=0.2)
             if result and (result.get("summary") or result.get("key_points")):
                 return result
         except Exception as e:
-            if attempt == 1:
-                log(f"    ✗ 分析失败，改用规则兜底: {e}")
-            else:
+            errors.append(str(e))
+            if attempt == 0:
                 time.sleep(3)
-    log("  使用规则兜底摘要（保证入库）")
-    return analyze_fallback(headline, date, leader, full_text)
+    raise RuntimeError("Grok 4.6 连续两次分析失败: " + " | ".join(errors))
+
+
+def _is_fallback_entry(item: Dict) -> bool:
+    return bool(
+        item.get("_fallback")
+        or "规则摘要" in str(item.get("verification_status", ""))
+    )
 
 
 def detect_change(new: Dict, history: List[Dict]) -> Dict:
@@ -908,6 +914,42 @@ def main() -> int:
     history_urls = {h.get("url"): h for h in history if h.get("url")}
     results: List[Dict] = list(history)  # 以历史为基底，增量补充
     results_urls = set(history_urls)
+
+    # 历史规则摘要优先用已保存正文重新分析，不依赖原链接再次出现在列表页。
+    reanalyzed_fallbacks = 0
+    for old in results:
+        if not _is_fallback_entry(old) or old.get("date", "") < since:
+            continue
+        full_text = str(old.get("full_text") or "")
+        if len(full_text) < 80:
+            continue
+        analysis = analyze(
+            str(old.get("headline") or ""),
+            str(old.get("date") or ""),
+            str(old.get("leader") or ""),
+            full_text,
+        )
+        old.update({
+            "occasion": analysis.get("occasion", old.get("occasion", "")),
+            "summary": analysis.get("summary", ""),
+            "key_points": analysis.get("key_points", []),
+            "new_phrasing": analysis.get("new_phrasing", []),
+            "theme": _correct_theme(
+                analysis.get("theme", ""),
+                str(old.get("headline") or ""),
+                analysis.get("occasion", ""),
+            ),
+            "subthemes": analysis.get("subthemes", []),
+            "keywords": analysis.get("keywords", []),
+            "policy_implications": analysis.get("policy_implications", ""),
+            "verification_status": "原文已核验",
+            "analyzed_at": datetime.now().isoformat(timespec="minutes"),
+        })
+        old.update(detect_change(old, results))
+        reanalyzed_fallbacks += 1
+        log(f"  Grok 4.6 已重分析历史规则摘要：{old.get('date')} · {old.get('headline', '')[:50]}")
+    if reanalyzed_fallbacks:
+        save(results)
 
     # 1. 先抓官方直连列表，避免搜索索引延迟；再用搜索和上观新闻补充
     candidates: List[Dict] = []
@@ -978,9 +1020,14 @@ def main() -> int:
 
     # 2 + 3 + 4. 过滤 + 分析
     skip_existed = skip_norel = skip_noleader = analyzed = 0
-    results_report_keys = {report_key(x) for x in results}
+    # 旧规则兜底条目不视为分析完成；候选再次出现时用 Grok 4.6 原位替换。
+    results_report_keys = {
+        report_key(x) for x in results if not _is_fallback_entry(x)
+    }
     for i, c in enumerate(candidates, 1):
-        if ((c["url"] in results_urls and history_urls.get(c["url"], {}).get("summary"))
+        old_by_url = history_urls.get(c["url"], {})
+        if ((c["url"] in results_urls and old_by_url.get("summary")
+             and not _is_fallback_entry(old_by_url))
                 or report_key(c) in results_report_keys):
             skip_existed += 1
             continue
@@ -1057,7 +1104,21 @@ def main() -> int:
             "analyzed_at": datetime.now().isoformat(timespec="minutes"),
         }
         entry.update(detect_change(entry, results))
-        results.append(entry)
+        old_fallback = next(
+            (
+                old for old in results
+                if _is_fallback_entry(old)
+                and (
+                    old.get("url") == c.get("url")
+                    or report_key(old) == report_key(c)
+                )
+            ),
+            None,
+        )
+        if old_fallback is None:
+            results.append(entry)
+        else:
+            results[results.index(old_fallback)] = entry
         results_urls.add(c["url"])
         results_report_keys.add(report_key(c))
         analyzed += 1

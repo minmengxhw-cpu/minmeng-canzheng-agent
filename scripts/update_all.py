@@ -2,9 +2,9 @@
 """Run the complete CZ Agent data refresh pipeline.
 
 可靠性原则：
-  - 采集失败尽量不阻断简报（有历史数据也应生成并推送）
-  - 简报步骤优先保证执行
-  - 各步独立记退出码，最终返回最严重失败码
+  - 任一核心采集失败就停止出报，禁止把抓取失败包装成“无新增”
+  - 采集成功后才生成简报与候选切口
+  - 各步独立记退出码，真实反映定时任务健康状态
 """
 
 from __future__ import annotations
@@ -60,9 +60,16 @@ def main() -> int:
     print(f"CZ Agent 自动更新开始：{datetime.now().isoformat(timespec='seconds')}", flush=True)
     codes: List[int] = []
 
-    # 采集：失败不阻断简报（仍可用历史 leaders / central 出报）
-    codes.append(run("抓取中央领导全国考察调研", "fetch_central.py", fetch_env, critical=False))
-    codes.append(run("抓取并分析领导动向", "fetch_leaders.py", fetch_env, critical=False))
+    # 两条核心通道必须都成功，避免用旧数据生成误导性的“无新增”简报。
+    codes.append(run("抓取中央领导全国考察调研", "fetch_central.py", fetch_env, critical=True))
+    codes.append(run("抓取并分析领导动向", "fetch_leaders.py", fetch_env, critical=True))
+    if codes[0] != 0 or codes[1] != 0:
+        print(
+            "ERROR: 核心采集不完整，拒绝生成简报；请修复后重跑",
+            file=sys.stderr,
+            flush=True,
+        )
+        return codes[0] or codes[1] or 1
 
     # 简报：关键步骤，必须尽量成功
     codes.append(run("生成动向速递", "gen_brief.py", critical=True))
@@ -74,7 +81,6 @@ def main() -> int:
         codes.append(run("生成切口初稿", "gen_drafts.py", draft_env, critical=False))
 
     print(f"\n更新完成：{datetime.now().isoformat(timespec='seconds')}", flush=True)
-    # 飞书日更成败只看简报；采集失败已 WARN，不得把 launchd 打成失败
     if codes[2] != 0:  # gen_brief
         return codes[2]
     return 0

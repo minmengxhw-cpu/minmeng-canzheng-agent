@@ -2,7 +2,7 @@
 """独立抓取中央 / 最高层公开信号（考察调研、重要会议与指示）。
 
 本通道与市委主要领导数据分开存储、分开统计，只对新来源 URL 调用 LLM
-（优先 MiniMax，额度不足回退 Grok Build）。
+（Grok CLI，grok-4.6）。
 公开页面中的具体身份统一在站内显示为“中央领导”，保留原文链接供追溯。
 
 轻量约束：
@@ -508,20 +508,16 @@ def analyze(date: str, headline: str, full_text: str) -> Dict[str, Any]:
 {full_text[:9000]}
 
 请提炼本次公开活动中的新提法、新要求和工作方法，重点回答：最高层释放了哪些方向性信号？哪些内容可转化为上海民主党派参政议政的调研切口？"""
-    try:
-        aliases = sorted(set(re.findall(
-            r"([\u4e00-\u9fff]{2,4})(?:总书记|国家主席)", full_text
-        )))
-        result = clean_result(
-            llm_json(SYSTEM_PROMPT, prompt, max_tokens=1100, temperature=0.2),
-            aliases,
-        )
-        if result and (result.get("summary") or result.get("key_points")):
-            return result
-    except Exception as exc:
-        log(f"模型分析失败：{exc}")
-    log("  使用规则兜底摘要")
-    return analyze_fallback(date, headline, full_text)
+    aliases = sorted(set(re.findall(
+        r"([\u4e00-\u9fff]{2,4})(?:总书记|国家主席)", full_text
+    )))
+    result = clean_result(
+        llm_json(SYSTEM_PROMPT, prompt, max_tokens=1100, temperature=0.2),
+        aliases,
+    )
+    if result and (result.get("summary") or result.get("key_points")):
+        return result
+    raise RuntimeError("Grok 4.6 未返回有效中央通道分析")
 
 def save(results: List[Dict[str, Any]]) -> int:
     previous_out = OUT.read_text(encoding="utf-8") if OUT.exists() else ""

@@ -30,10 +30,10 @@ else
   bad "缺少 $PLIST — 请 bash scripts/install_launchd.sh"
 fi
 
-# 2) 仅 08:30（不得用 || true 吞掉 python 失败码，否则永远 PASS）
-echo "[2] 定时仅 08:30"
+# 2) 09:00 / 21:00 双时段
+echo "[2] 定时 09:00 / 21:00"
 if [[ -f "$PLIST" ]]; then
-  if python3 - <<'PY'
+  if /usr/bin/python3 - <<'PY'
 import plistlib, sys
 from pathlib import Path
 p = Path.home() / "Library/LaunchAgents/com.minmeng.canzheng-agent.plist"
@@ -41,16 +41,16 @@ d = plistlib.loads(p.read_bytes())
 sched = d.get("StartCalendarInterval")
 if isinstance(sched, dict):
     sched = [sched]
-ok_s = [{"Hour": 8, "Minute": 30}]
+ok_s = [{"Hour": 9, "Minute": 0}, {"Hour": 21, "Minute": 0}]
 if sched == ok_s:
     sys.exit(0)
 print("FAIL", sched)
 sys.exit(1)
 PY
   then
-    ok "StartCalendarInterval = 仅 08:30"
+    ok "StartCalendarInterval = 09:00 / 21:00"
   else
-    bad "定时不是仅 08:30 — 禁止晚报/双时段"
+    bad "定时不是 09:00 / 21:00 — 请重跑 install_launchd.sh"
   fi
 fi
 
@@ -61,7 +61,7 @@ if [[ -f "$ENVF" ]]; then
   CHAT=$(grep -E '^FEISHU_CHAT_ID=' "$ENVF" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
 fi
 if [[ -f "$PLIST" ]]; then
-  PLIST_CHAT=$(python3 -c "import plistlib;from pathlib import Path;d=plistlib.loads(Path('$PLIST').read_bytes());print(d.get('EnvironmentVariables',{}).get('FEISHU_CHAT_ID',''))")
+  PLIST_CHAT=$(/usr/bin/python3 -c "import plistlib;from pathlib import Path;d=plistlib.loads(Path('$PLIST').read_bytes());print(d.get('EnvironmentVariables',{}).get('FEISHU_CHAT_ID',''))")
 else
   PLIST_CHAT=""
 fi
@@ -84,23 +84,22 @@ if grep -qE '^FEISHU_WEBHOOK=' "$ENVF" 2>/dev/null && ! grep -qE '^#.*FEISHU_WEB
   fi
 fi
 
-# 4) 分析引擎：MiniMax 主 + Grok 回退
-echo "[4] 分析引擎（MiniMax → Grok）"
-MMX="${MINIMAX_CLI:-/opt/homebrew/bin/mmx}"
+# 4) 分析引擎：仅 Grok 4.6
+echo "[4] 分析引擎（仅 Grok 4.6）"
 GROK="${GROK_CLI:-$HOME/.grok/bin/grok}"
-if [[ -x "$MMX" ]] || command -v mmx >/dev/null 2>&1; then
-  ok "MiniMax mmx 可执行 (${MMX:-$(command -v mmx)})"
-else
-  wrn "找不到 mmx — 将依赖 Grok 回退"
-fi
 if [[ -x "$GROK" ]] || command -v grok >/dev/null 2>&1; then
-  ok "Grok Build 可执行 (${GROK:-$(command -v grok)})"
+  ok "Grok CLI 可执行 (${GROK:-$(command -v grok)})"
 else
-  wrn "找不到 grok — MiniMax 失败时无回退"
+  bad "找不到 grok — 分析链路会失败"
 fi
-if ! { [[ -x "$MMX" ]] || command -v mmx >/dev/null 2>&1; } \
-  && ! { [[ -x "$GROK" ]] || command -v grok >/dev/null 2>&1; }; then
-  bad "mmx 与 grok 均不可用 — 分析链路会失败"
+if [[ -f "$PLIST" ]]; then
+  PLIST_MODEL=$(/usr/bin/python3 -c "import plistlib;from pathlib import Path;d=plistlib.loads(Path('$PLIST').read_bytes());print(d.get('EnvironmentVariables',{}).get('GROK_MODEL',''))")
+  [[ "$PLIST_MODEL" == "grok-4.6" ]] && ok "launchd model=grok-4.6" || bad "launchd model='$PLIST_MODEL'，期望 grok-4.6"
+fi
+if /usr/bin/python3 -c 'import requests, bs4' >/dev/null 2>&1; then
+  ok "/usr/bin/python3 抓取依赖完整"
+else
+  bad "/usr/bin/python3 缺 requests / beautifulsoup4"
 fi
 
 # 5) 外部群发言权限 + 机器人在群
@@ -128,7 +127,7 @@ else
   wrn "无 lark-cli，跳过群权限检查"
 fi
 
-# 6) 今日 08:30 是否跑过且推送
+# 6) 今日 09:00 / 21:00 是否按时运行并推送
 echo "[6] 今日定时执行日志"
 TODAY=$(date +%Y-%m-%d)
 # 禁止 08 被当成八进制
@@ -136,9 +135,9 @@ HOUR=$((10#$(date +%H)))
 MIN=$((10#$(date +%M)))
 if [[ -f "$OUT_LOG" ]]; then
   # 必须出现「今日」自动更新开始，不能用历史「执行引擎」行误报
-  if rg -q "自动更新开始：${TODAY}T08:3" "$OUT_LOG" 2>/dev/null; then
-    ok "日志出现今日 08:30 流水线启动：自动更新开始：${TODAY}T08:3x"
-  elif rg -q "开始流水线.*report_date=${TODAY}|开始流水线（MiniMax→Grok|开始流水线（采集" "$OUT_LOG" 2>/dev/null \
+  if rg -q "自动更新开始：${TODAY}T09:0" "$OUT_LOG" 2>/dev/null; then
+    ok "日志出现今日 09:00 流水线启动"
+  elif rg -q "开始流水线.*report_date=${TODAY}|开始流水线（采集" "$OUT_LOG" 2>/dev/null \
     && rg -q "${TODAY}" <(tail -c 20000 "$OUT_LOG" 2>/dev/null); then
     # 兼容新脚本在 fetch 前打印「开始流水线」
     if tail -c 30000 "$OUT_LOG" | rg -q "开始流水线"; then
@@ -146,18 +145,27 @@ if [[ -f "$OUT_LOG" ]]; then
       if [[ "$(date -r "$OUT_LOG" +%F 2>/dev/null || true)" == "$TODAY" ]]; then
         ok "今日 out 日志有更新且含开始流水线"
       else
-        bad "未见今日 08:30 完整启动标记"
+        bad "未见今日 09:00 完整启动标记"
       fi
     fi
   else
-    if [[ "$HOUR" -lt 8 || ( "$HOUR" -eq 8 && "$MIN" -lt 35 ) ]]; then
-      wrn "尚未到/刚过 08:30，今日日志可暂无"
+    if [[ "$HOUR" -lt 9 || ( "$HOUR" -eq 9 && "$MIN" -lt 10 ) ]]; then
+      wrn "尚未到/刚过 09:00，今日日志可暂无"
     else
-      bad "今日 08:30 未见「自动更新开始：${TODAY}T08:3x」— 可能漏跑"
+      bad "今日 09:00 未见完整启动标记 — 可能漏跑"
     fi
   fi
+  if [[ "$HOUR" -gt 21 || ( "$HOUR" -eq 21 && "$MIN" -ge 10 ) ]]; then
+    if rg -q "自动更新开始：${TODAY}T21:0" "$OUT_LOG" 2>/dev/null; then
+      ok "日志出现今日 21:00 流水线启动"
+    else
+      bad "今日 21:00 未见完整启动标记 — 可能漏跑"
+    fi
+  else
+    wrn "尚未到今晚 21:00，不检查晚报"
+  fi
   # 今日推送：在今日相关段落内找「已主动推送」，避免历史误报
-  if python3 - <<PY
+  if /usr/bin/python3 - <<PY
 from pathlib import Path
 import re
 p=Path("$OUT_LOG")
@@ -177,7 +185,7 @@ PY
   then
     ok "今日流水线段落内已出现「已主动推送飞书」"
   else
-    if [[ "$HOUR" -lt 8 || ( "$HOUR" -eq 8 && "$MIN" -lt 40 ) ]]; then
+    if [[ "$HOUR" -lt 9 || ( "$HOUR" -eq 9 && "$MIN" -lt 15 ) ]]; then
       wrn "今日尚无飞书推送记录（或尚未到推送完成窗口）"
     else
       bad "今日未见飞书推送成功日志 — 查 launchd.out/err"

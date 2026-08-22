@@ -62,14 +62,20 @@ def grok_json(system: str, user: str, max_tokens: int = 1800,
     cmd = [
         executable,
         "-p", prompt,
-        "--model", os.environ.get("GROK_MODEL", "grok-4.5"),
+        "--system-prompt-override",
+        (
+            "You are a deterministic JSON extraction engine. "
+            "Never use tools. Follow the supplied instructions and return "
+            "exactly one strict JSON object."
+        ),
+        "--model", os.environ.get("GROK_MODEL", "grok-4.6"),
         "--output-format", "json",
         "--json-schema", '{"type":"object"}',
         "--no-alt-screen",
         "--no-subagents",
-        "--max-turns", "1",
+        "--max-turns", os.environ.get("GROK_MAX_TURNS", "5"),
+        "--tools", "",
         "--disable-web-search",
-        "--no-memory",
         "--verbatim",
         "--permission-mode", os.environ.get("GROK_PERMISSION_MODE", "bypassPermissions"),
         "--always-approve",

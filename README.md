@@ -4,7 +4,7 @@
 
 网站：<https://minmengxhw-cpu.github.io/minmeng-canzheng-agent/>
 
-数据每天北京时间 **08:30** 自动更新一次（本机 launchd），并推送 1 分钟可读的参政议政动态简报。
+数据每天北京时间 **09:00 / 21:00** 自动更新（本机 launchd），由 **Grok 4.6** 分析，并推送 1 分钟可读的参政议政动态简报。
 
 ## 飞书主动推送到手机
 
@@ -63,7 +63,7 @@ python3 scripts/gen_brief.py
 bash scripts/install_launchd.sh
 ```
 
-之后每天 9 点 / 21 点：抓取 → 写数据 → **推飞书** → 有变化则 push 网站。
+之后每天 9 点 / 21 点：抓取 → Grok 4.6 分析 → 写数据 → **推飞书** → 有变化则 push 网站。
 
 默认：**有当日新增信号才推**；要「无新闻也推一句」时设 `FEISHU_PUSH_ALWAYS=1`。
 
